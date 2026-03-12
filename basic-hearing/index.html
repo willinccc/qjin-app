@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>求人ヒアリングフォーム - 求人飲食店ドットコム</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -85,7 +86,7 @@
         <div class="flex items-center gap-3 text-xs">
             <span id="autoSaveLabel" class="text-blue-200 opacity-0 transition-opacity">✓ 自動保存済み</span>
             <button onclick="downloadCSV()" class="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-300/40 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">
-                CSVダウンロード
+                求人情報CSVをダウンロード
             </button>
             <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
             <button onclick="document.getElementById('csvFileInput').click()" class="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-300/40 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">
@@ -124,7 +125,7 @@
             </button>
             <button class="tab-btn flex-1 md:flex-none md:px-8 py-2.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100"
                 onclick="switchTab('job', this)">
-                <span class="hidden md:inline">② </span>求人条件
+                <span class="hidden md:inline">② </span>求人情報
             </button>
         </div>
     </div>
@@ -137,14 +138,31 @@
      =================================================== -->
 <div id="tab-store" class="tab-pane active space-y-5">
 
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-        <p class="font-bold mb-1">📋 店舗情報について</p>
-        <p>既にご登録済みの情報がある場合は入力不要です。新規のお客様や情報変更がある場合にご記入ください。</p>
-    </div>
+    <!-- 折りたたみ式案内（デフォルト閉じ） -->
+    <details class="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden group">
+        <summary class="flex items-center justify-between px-4 py-3 cursor-pointer select-none">
+            <span class="text-sm font-bold text-blue-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"/></svg>
+                ① 店舗情報の入力について
+            </span>
+            <span class="text-blue-400 text-xs">▼ タップして確認</span>
+        </summary>
+        <div class="px-4 pb-4 pt-1 text-sm text-blue-800 space-y-3 border-t border-blue-200">
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <p class="font-bold text-blue-700 mb-1">🔰 初めてご利用のお客様</p>
+                <p class="text-xs leading-relaxed">「<span class="font-bold">必須</span>」と表示されている項目はすべてご記入ください。お電話番号・メールアドレスは求職者への公開・応募通知に使用されます。</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <p class="font-bold text-blue-700 mb-1">🔄 掲載実績があるお客様</p>
+                <p class="text-xs leading-relaxed">店舗名・所在地・お電話番号・メールアドレスなどに変更がない場合は、省略いただいて構いません。<br>「お店のアピール・採用背景」は過去の掲載内容から更新いただくと採用効果が高まります。できる範囲でご記入ください。</p>
+            </div>
+        </div>
+    </details>
 
     <!-- S1: 基本情報 -->
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">基本情報・担当者</h2>
+        <h2 class="text-sm font-bold text-gray-800 mb-1 border-l-4 border-blue-500 pl-3">基本情報・担当者</h2>
+        <p class="text-[11px] text-gray-400 mb-4 pl-3">既存のお客様は変更がある場合のみご記入ください</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs font-bold text-gray-600 mb-1 req">法人名（会社名）</label>
@@ -181,7 +199,8 @@
 
     <!-- S2: 所在地 -->
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">所在地</h2>
+        <h2 class="text-sm font-bold text-gray-800 mb-1 border-l-4 border-blue-500 pl-3">所在地</h2>
+        <p class="text-[11px] text-gray-400 mb-4 pl-3">既存のお客様は変更がある場合のみご記入ください</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label class="block text-xs font-bold text-gray-600 mb-1">郵便番号</label>
@@ -220,7 +239,8 @@
 
     <!-- S3: 連絡先 -->
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">連絡先・ウェブ情報</h2>
+        <h2 class="text-sm font-bold text-gray-800 mb-1 border-l-4 border-blue-500 pl-3">連絡先・ウェブ情報</h2>
+        <p class="text-[11px] text-gray-400 mb-4 pl-3">既存のお客様はお電話番号・メールアドレスに変更がある場合のみご記入ください</p>
         <div class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -363,7 +383,8 @@
 
     <!-- S7: アピール -->
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-emerald-500 pl-3">お店のアピール・採用背景</h2>
+        <h2 class="text-sm font-bold text-gray-800 mb-1 border-l-4 border-emerald-500 pl-3">お店のアピール・採用背景</h2>
+        <p class="text-[11px] text-emerald-600 mb-4 pl-3">前回掲載時からの変化や新鮮な情報をご記入いただくと採用効果が高まります</p>
         <div class="space-y-4">
             <div>
                 <label class="block text-xs font-bold text-gray-600 mb-2">採用の背景・理由</label>
@@ -418,7 +439,7 @@
     <div class="flex justify-end py-4">
         <button onclick="switchTab('job', document.querySelectorAll('.tab-btn')[1])"
             class="bg-[#1e3a5f] hover:bg-[#162d4a] text-white font-bold px-8 py-3 rounded-xl flex items-center gap-2 transition shadow-md">
-            求人条件の入力へ →
+            求人情報の入力へ →
         </button>
     </div>
 </div>
@@ -428,6 +449,27 @@
      STEP 2: 求人条件タブ
      =================================================== -->
 <div id="tab-job" class="tab-pane space-y-5">
+
+    <!-- 折りたたみ式案内（デフォルト閉じ） -->
+    <details class="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+        <summary class="flex items-center justify-between px-4 py-3 cursor-pointer select-none">
+            <span class="text-sm font-bold text-amber-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"/></svg>
+                ② 求人情報の入力について
+            </span>
+            <span class="text-amber-400 text-xs">▼ タップして確認</span>
+        </summary>
+        <div class="px-4 pb-4 pt-1 text-sm text-amber-800 space-y-3 border-t border-amber-200">
+            <div class="bg-white rounded-lg p-3 border border-amber-100">
+                <p class="font-bold text-amber-700 mb-1">📝 入力の進め方</p>
+                <p class="text-xs leading-relaxed">まずメインとなる職種・雇用形態を1件入力してください。その後「<span class="font-bold">コピーして作成</span>」ボタンを使うと、入力済みの内容を引き継いで別の職種・雇用形態の案件をスムーズに作成できます。</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 border border-amber-100">
+                <p class="font-bold text-amber-700 mb-1">⚠️ 掲載ルールについて</p>
+                <p class="text-xs leading-relaxed">同じ職種・同じ雇用形態での重複掲載はできません。<br>異なる職種、または異なる雇用形態（例：正社員とアルバイト）であれば、1つの原稿に複数の求人情報を掲載いただけます。</p>
+            </div>
+        </div>
+    </details>
 
     <!-- 案件追加ボタン -->
     <div class="flex justify-between items-center">
@@ -483,7 +525,7 @@
                         <select name="job_title" onchange="handleInputChange()" class="job-title-input w-full border border-gray-300 p-2 rounded-lg text-sm bg-white">
                             <option value="店長候補・マネージャー">店長候補・マネージャー</option>
                             <option value="サービス・ホール">サービス・ホール</option>
-                            <option value="料理長候補（シェフ・板前など）">料理長候補（シェフ・板前など）</option>
+                            <option value="料理長候補（シェフ・板長など）">料理長候補（シェフ・板長など）</option>
                             <option value="調理スタッフ">調理スタッフ</option>
                             <option value="調理補助・調理見習い">調理補助・調理見習い</option>
                             <option value="パティシエ">パティシエ</option>
@@ -505,9 +547,8 @@
                         <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">雇用形態</label>
                         <select name="employment_type" onchange="handleInputChange()" class="employment-type-input w-full border border-gray-300 p-2 rounded-lg text-sm bg-white">
                             <option value="正社員">正社員</option>
-                            <option value="アルバイト・パート">アルバイト・パート</option>
-                            <option value="契約社員">契約社員</option>
-                            <option value="業務委託">業務委託</option>
+                            <option value="アルバイト">アルバイト</option>
+                            <option value="その他">その他（契約社員・業務委託など）</option>
                         </select>
                     </div>
                     <div>
@@ -525,17 +566,17 @@
                     <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">給与種別</label>
-                            <select name="salary_type" class="w-full border border-gray-200 p-2 rounded-lg text-sm bg-slate-50">
+                            <select name="salary_type" onchange="updateSalaryUnit(this)" class="w-full border border-gray-200 p-2 rounded-lg text-sm bg-slate-50">
                                 <option value="月給">月給</option><option value="時給">時給</option><option value="年俸">年俸</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">給与下限</label>
-                            <div class="relative"><input type="number" name="salary_min" class="w-full border border-gray-200 p-2 pr-7 rounded-lg text-sm" placeholder="250000"><span class="absolute right-2 top-2 text-slate-400 text-xs">円</span></div>
+                            <div class="relative"><input type="number" name="salary_min" class="w-full border border-gray-200 p-2 pr-10 rounded-lg text-sm" placeholder="25"><span class="salary-unit absolute right-2 top-2 text-slate-400 text-xs">万円</span></div>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-600 mb-1">給与上限</label>
-                            <div class="relative"><input type="number" name="salary_max" class="w-full border border-gray-200 p-2 pr-7 rounded-lg text-sm" placeholder="450000"><span class="absolute right-2 top-2 text-slate-400 text-xs">円</span></div>
+                            <div class="relative"><input type="number" name="salary_max" class="w-full border border-gray-200 p-2 pr-10 rounded-lg text-sm" placeholder="45"><span class="salary-unit absolute right-2 top-2 text-slate-400 text-xs">万円</span></div>
                         </div>
                         <div class="sm:col-span-3 space-y-2">
                             <label class="block text-[10px] font-bold text-slate-500 uppercase">給与備考 (CSV項目)</label>
@@ -938,6 +979,9 @@ function addNewJob(data = null, shouldSave = true) {
         if (hv === 'yes') card.querySelector('.helper-fields').classList.remove('hidden');
         const noteVal = data['salary_note'] || '';
         if (noteVal) parseSalaryNoteIntoFields(card, noteVal);
+        // 給与種別に合わせて単位表示を更新
+        const salaryTypeEl = card.querySelector('[name="salary_type"]');
+        if (salaryTypeEl) updateSalaryUnit(salaryTypeEl);
     }
     validateDuplicates();
     if (shouldSave) scheduleSave(0);
@@ -984,6 +1028,21 @@ function handleInputChange() { validateDuplicates(); scheduleSave(0); }
 // ===================================================
 // 固定残業代補助
 // ===================================================
+// 給与種別に応じて単位ラベルとplaceholderを切り替える
+// 月給・年俸 → 万円単位（システム側の仕様に合わせる）
+// 時給 → 円単位
+function updateSalaryUnit(select) {
+    const card     = select.closest('.job-card');
+    const isManEn  = ['月給', '年俸'].includes(select.value);
+    const unit     = isManEn ? '万円' : '円';
+    const phMin    = isManEn ? '25'   : '1000';
+    const phMax    = isManEn ? '45'   : '1500';
+    card.querySelectorAll('.salary-unit').forEach(el => el.textContent = unit);
+    card.querySelector('[name="salary_min"]').placeholder = phMin;
+    card.querySelector('[name="salary_max"]').placeholder = phMax;
+    scheduleSave(0);
+}
+
 function handleHelperChange(radio) {
     const card = radio.closest('.job-card');
     const box  = card.querySelector('.helper-fields');

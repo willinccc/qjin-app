@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>求人ヒアリングフォーム - 求人飲食店ドットコム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; background: #f4f6f9; }
+
+        /* 必須バッジ */
+        .req::after {
+            content: "必須";
+            margin-left: 6px;
+            font-size: 0.6rem;
+            background: #ef4444;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 3px;
+            vertical-align: middle;
+            font-weight: 700;
+        }
+
+        /* タブ */
+        .tab-btn { transition: all .2s; }
+        .tab-btn.active {
+            background: #1e3a5f;
+            color: white;
+            box-shadow: 0 2px 8px rgba(30,58,95,.25);
+        }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        /* 求人カード */
+        .job-card { animation: fadeIn .25s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+        /* 重複エラー */
+        .duplicate-error { border-color: #ef4444 !important; background: #fef2f2; }
+
+        /* 必須バッジ（求人フォーム用） */
+        .required-badge::after {
+            content: "必須";
+            margin-left: 6px;
+            font-size: 0.6rem;
+            background: #ef4444;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 3px;
+            vertical-align: middle;
+            font-weight: 700;
+        }
+
+        /* スピナー */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; display:inline-block; }
+
+        /* 入力フォーカス統一 */
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+        }
+
+        /* ステップバー */
+        .step-bar-fill { transition: width .4s ease; }
+
+        details summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+<!-- ===== HEADER ===== -->
+<header class="bg-[#1e3a5f] text-white sticky top-0 z-50 shadow-lg">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-base md:text-lg font-bold tracking-tight">求人ヒアリングフォーム</h1>
+                <span class="text-[10px] bg-blue-400/30 border border-blue-300/40 px-2 py-0.5 rounded font-mono">v3.0.0</span>
+            </div>
+            <p class="text-blue-200 text-xs mt-0.5">求人飲食店ドットコム 掲載用</p>
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+            <span id="autoSaveLabel" class="text-blue-200 opacity-0 transition-opacity">✓ 自動保存済み</span>
+            <button onclick="downloadCSV()" class="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-300/40 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">
+                CSVダウンロード
+            </button>
+            <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+            <button onclick="document.getElementById('csvFileInput').click()" class="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-300/40 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">
+                CSV読み込み
+            </button>
+        </div>
+    </div>
+
+    <!-- クライアント名入力 -->
+    <div class="bg-[#162d4a] border-t border-blue-700/40">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row gap-3 items-start md:items-end">
+            <p class="text-xs text-blue-300 font-bold whitespace-nowrap pt-1.5">クライアント情報
+                <span class="text-rose-300 font-normal ml-1">※どちらか必須</span>
+            </p>
+            <div class="flex flex-1 flex-col sm:flex-row gap-2 w-full">
+                <input type="text" id="clientCompany" oninput="saveClientInfo()"
+                    placeholder="法人名・会社名（例：株式会社〇〇フード）"
+                    class="flex-1 bg-[#1e3a5f] border border-blue-600/50 text-white placeholder-blue-400 text-sm px-3 py-2 rounded-lg focus:border-blue-400">
+                <input type="text" id="clientShop" oninput="saveClientInfo()"
+                    placeholder="店舗名・屋号（例：ビストロ〇〇 渋谷店）"
+                    class="flex-1 bg-[#1e3a5f] border border-blue-600/50 text-white placeholder-blue-400 text-sm px-3 py-2 rounded-lg focus:border-blue-400">
+            </div>
+        </div>
+        <p id="clientError" class="hidden max-w-5xl mx-auto px-4 pb-2 text-xs text-rose-300 font-bold">⚠ 法人名または店舗名を入力してください。</p>
+    </div>
+</header>
+
+<!-- ===== TAB NAV ===== -->
+<div class="bg-white border-b shadow-sm sticky top-[110px] z-40">
+    <div class="max-w-5xl mx-auto px-4">
+        <div class="flex gap-1 py-2">
+            <button class="tab-btn active flex-1 md:flex-none md:px-8 py-2.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100"
+                onclick="switchTab('store', this)">
+                <span class="hidden md:inline">① </span>店舗情報
+                <span id="storeCheck" class="hidden ml-1 text-emerald-500">✓</span>
+            </button>
+            <button class="tab-btn flex-1 md:flex-none md:px-8 py-2.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100"
+                onclick="switchTab('job', this)">
+                <span class="hidden md:inline">② </span>求人条件
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="max-w-5xl mx-auto px-4 mt-5">
+
+<!-- ===================================================
+     STEP 1: 店舗情報タブ
+     =================================================== -->
+<div id="tab-store" class="tab-pane active space-y-5">
+
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+        <p class="font-bold mb-1">📋 店舗情報について</p>
+        <p>既にご登録済みの情報がある場合は入力不要です。新規のお客様や情報変更がある場合にご記入ください。</p>
+    </div>
+
+    <!-- S1: 基本情報 -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">基本情報・担当者</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">法人名（会社名）</label>
+                <input type="text" name="s_companyName" placeholder="例：株式会社〇〇フード"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">店舗名・屋号</label>
+                <input type="text" name="s_storeName" placeholder="例：ビストロ〇〇 渋谷店"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">店名（カナ）</label>
+                <input type="text" name="s_storeNameKana" placeholder="例：ビストロマルマル シブヤテン"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">担当者名</label>
+                <input type="text" name="s_staffName" placeholder="例：田中 太郎"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">担当者名（カナ）</label>
+                <input type="text" name="s_staffNameKana" placeholder="例：タナカ タロウ"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">役職</label>
+                <input type="text" name="s_staffTitle" placeholder="例：店長・オーナー・人事担当"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+        </div>
+    </section>
+
+    <!-- S2: 所在地 -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">所在地</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">郵便番号</label>
+                <input type="text" name="s_zip" placeholder="例：1234567"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">都道府県</label>
+                <select name="s_pref" id="prefList"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">市区町村</label>
+                <input type="text" name="s_city" placeholder="例：新宿区"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">町域・番地</label>
+                <input type="text" name="s_address" placeholder="例：西新宿1-1-1"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">ビル名・階数</label>
+                <input type="text" name="s_building" placeholder="例：〇〇ビル 2F"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">最寄り駅・アクセス</label>
+                <input type="text" name="s_access" placeholder="例：JR新宿駅 西口より徒歩3分"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+        </div>
+    </section>
+
+    <!-- S3: 連絡先 -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">連絡先・ウェブ情報</h2>
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1 req">店舗電話番号</label>
+                    <input type="tel" name="s_tel_main" placeholder="例：03-1234-5678"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1 req">担当者連絡先</label>
+                    <input type="tel" name="s_tel_contact" placeholder="例：090-1234-5678"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">FAX番号</label>
+                    <input type="tel" name="s_fax" placeholder="例：03-1234-5679"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                </div>
+            </div>
+            <div class="border-t pt-4">
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">メールアドレス（公開・通知用）</label>
+                <p class="text-[10px] text-gray-400 mb-2">求職者への公開・システム通知に使用されます</p>
+                <input type="email" name="s_email_1" placeholder="例：info@example.com"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <input type="email" name="s_email_2" placeholder="メールアドレス 2（任意）"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                    <input type="email" name="s_email_3" placeholder="メールアドレス 3（任意）"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                </div>
+            </div>
+            <div class="border-t pt-4 space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">公式ホームページ URL</label>
+                    <input type="url" name="s_homepage" placeholder="https://www.example.com"
+                        class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+                </div>
+                <p class="text-xs font-bold text-blue-600">SNS・掲載URL（任意）</p>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-3">
+                        <span class="w-24 text-xs font-bold text-gray-500 text-right shrink-0">Instagram</span>
+                        <input type="text" name="s_sns_instagram" placeholder="アカウント名またはURL"
+                            class="flex-1 border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="w-24 text-xs font-bold text-gray-500 text-right shrink-0">X (Twitter)</span>
+                        <input type="text" name="s_sns_x" placeholder="アカウント名またはURL"
+                            class="flex-1 border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="w-24 text-xs font-bold text-gray-500 text-right shrink-0">食べログ</span>
+                        <input type="text" name="s_sns_tabelog" placeholder="店舗ページURL"
+                            class="flex-1 border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="w-24 text-xs font-bold text-gray-500 text-right shrink-0">その他URL</span>
+                        <input type="text" name="s_url_other" placeholder="他媒体の掲載URLなど"
+                            class="flex-1 border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- S4: 業態詳細 -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">業態詳細</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">メイン業態</label>
+                <select name="s_category1" id="categoryList1"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">サブ業態（任意）</label>
+                <select name="s_category2" id="categoryList2"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">業態の詳細説明</label>
+                <input type="text" name="s_categoryDetail" placeholder="例：本格薪窯で焼くナポリピッツァ専門店"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+        </div>
+    </section>
+
+    <!-- S5: 営業情報 -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">営業情報</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">客単価（昼）</label>
+                <select name="s_priceLunch" id="priceLunchList"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">客単価（夜）</label>
+                <select name="s_priceDinner" id="priceDinnerList"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">総席数</label>
+                <select name="s_seats" id="seatsList"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">喫煙</label>
+                <select name="s_smoking" id="smokingList"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm bg-white">
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">営業時間</label>
+                <input type="text" name="s_businessHours" placeholder="例：11:00〜14:30 / 17:00〜23:00"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">定休日</label>
+                <input type="text" name="s_closedDay" placeholder="例：毎週月曜日 / 不定休"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+        </div>
+    </section>
+
+    <!-- S6: こだわり -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">こだわり条件</h2>
+        <div id="featureContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+    </section>
+
+    <!-- S7: アピール -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-sm font-bold text-gray-800 mb-4 border-l-4 border-emerald-500 pl-3">お店のアピール・採用背景</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-2">採用の背景・理由</label>
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <label class="flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg bg-gray-50 cursor-pointer hover:bg-blue-50"><input type="radio" name="s_hiringReason" value="増員"> 増員</label>
+                    <label class="flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg bg-gray-50 cursor-pointer hover:bg-blue-50"><input type="radio" name="s_hiringReason" value="欠員補充"> 欠員補充</label>
+                    <label class="flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg bg-gray-50 cursor-pointer hover:bg-blue-50"><input type="radio" name="s_hiringReason" value="新規オープン"> 新規オープン</label>
+                    <label class="flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg bg-gray-50 cursor-pointer hover:bg-blue-50"><input type="radio" name="s_hiringReason" value="移転・リニューアル"> 移転・リニューアル</label>
+                </div>
+                <input type="text" name="s_hiringReasonDetail" placeholder="詳細があれば（例：来春の2号店オープンに向け）"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">現在のスタッフ構成</label>
+                <input type="text" name="s_staffComposition" placeholder="例：社員5名・アルバイト10名、20〜40代が中心"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1 req">職場の雰囲気・社風</label>
+                <textarea name="s_atmosphere" rows="3" placeholder="例：スタッフ同士の仲が良くアットホームな雰囲気。向上心のある方が多く、技術を磨ける環境です。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">お店のこだわり・強み</label>
+                <textarea name="s_strengths" rows="3" placeholder="例：国産食材にこだわり、生産者との直接取引を行っています。受賞歴や雑誌掲載実績なども歓迎。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">教育体制・研修内容</label>
+                <textarea name="s_training" rows="2" placeholder="例：入社後1ヶ月は先輩スタッフがOJTでサポート。外部研修への参加費用は会社負担。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">求める人物像</label>
+                <textarea name="s_idealPerson" rows="2" placeholder="例：料理への情熱がある方、チームワークを大切にできる方。経験よりも人柄を重視します。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">将来のビジョン・キャリアパス</label>
+                <textarea name="s_career" rows="2" placeholder="例：将来的に独立希望の方も歓迎。実力次第で店長・料理長へのキャリアアップが可能。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">その他・特記事項</label>
+                <textarea name="s_notes" rows="2" placeholder="その他、求人原稿に記載してほしい情報があればご記入ください。"
+                    class="w-full border border-gray-300 px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- 次のタブへ -->
+    <div class="flex justify-end py-4">
+        <button onclick="switchTab('job', document.querySelectorAll('.tab-btn')[1])"
+            class="bg-[#1e3a5f] hover:bg-[#162d4a] text-white font-bold px-8 py-3 rounded-xl flex items-center gap-2 transition shadow-md">
+            求人条件の入力へ →
+        </button>
+    </div>
+</div>
+<!-- /tab-store -->
+
+<!-- ===================================================
+     STEP 2: 求人条件タブ
+     =================================================== -->
+<div id="tab-job" class="tab-pane space-y-5">
+
+    <!-- 案件追加ボタン -->
+    <div class="flex justify-between items-center">
+        <p class="text-sm text-gray-500">職種ごとに案件カードを追加してください。</p>
+        <button onclick="addNewJob()"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            新規案件を追加
+        </button>
+    </div>
+
+    <!-- 案件カードリスト -->
+    <div id="jobList" class="space-y-5"></div>
+
+    <!-- 空状態 -->
+    <div id="emptyState" class="hidden bg-white border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center">
+        <p class="text-slate-400 text-sm">案件がありません。「新規案件を追加」ボタンから作成してください。</p>
+    </div>
+
+    <!-- 送信ボタンエリア -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col items-center gap-3">
+        <p class="text-xs text-gray-500 text-center">入力内容を確認の上、送信してください。送信後、担当者より順次ご連絡いたします。</p>
+        <button onclick="submitAll()"
+            class="bg-[#1e3a5f] hover:bg-[#162d4a] text-white font-bold py-4 px-14 rounded-full shadow-lg transition active:scale-95 flex items-center gap-2 text-base">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            すべての情報を送信する
+        </button>
+        <p id="submitStatus" class="text-xs text-gray-400"></p>
+    </div>
+</div>
+<!-- /tab-job -->
+
+</div><!-- /max-w-5xl -->
+
+<!-- ===== JOB CARD TEMPLATE ===== -->
+<template id="jobCardTemplate">
+    <div class="job-card bg-white shadow-sm rounded-2xl overflow-hidden border border-slate-200">
+        <div class="bg-slate-50 px-4 py-3 border-b flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider card-number">案件 #1</span>
+            <div class="flex gap-3">
+                <button class="copy-btn text-blue-600 hover:text-blue-800 text-xs font-bold">コピーして作成</button>
+                <button class="delete-btn text-rose-600 hover:text-rose-800 text-xs font-bold">削除</button>
+            </div>
+        </div>
+        <div class="p-4 md:p-5 space-y-7">
+
+            <!-- 1. 基本設定 -->
+            <section>
+                <h3 class="text-xs font-bold text-slate-700 mb-3 border-l-4 border-blue-500 pl-2">1. 基本設定</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">職種</label>
+                        <select name="job_title" onchange="handleInputChange()" class="job-title-input w-full border border-gray-300 p-2 rounded-lg text-sm bg-white">
+                            <option value="店長候補・マネージャー">店長候補・マネージャー</option>
+                            <option value="サービス・ホール">サービス・ホール</option>
+                            <option value="料理長候補（シェフ・板前など）">料理長候補（シェフ・板前など）</option>
+                            <option value="調理スタッフ">調理スタッフ</option>
+                            <option value="調理補助・調理見習い">調理補助・調理見習い</option>
+                            <option value="パティシエ">パティシエ</option>
+                            <option value="パン職人・ブーランジェ">パン職人・ブーランジェ</option>
+                            <option value="ピザ職人・ピッツァイオーロ">ピザ職人・ピッツァイオーロ</option>
+                            <option value="ソムリエ">ソムリエ</option>
+                            <option value="バーテンダー">バーテンダー</option>
+                            <option value="バリスタ">バリスタ</option>
+                            <option value="レセプション・フロント">レセプション・フロント</option>
+                            <option value="洗い場・皿洗い">洗い場・皿洗い</option>
+                            <option value="販売スタッフ">販売スタッフ</option>
+                            <option value="本部スタッフ・SV">本部スタッフ・SV</option>
+                            <option value="デリバリー・配達スタッフ">デリバリー・配達スタッフ</option>
+                            <option value="食品加工・製造（精肉・鮮魚等）">食品加工・製造（精肉・鮮魚等）</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">雇用形態</label>
+                        <select name="employment_type" onchange="handleInputChange()" class="employment-type-input w-full border border-gray-300 p-2 rounded-lg text-sm bg-white">
+                            <option value="正社員">正社員</option>
+                            <option value="アルバイト・パート">アルバイト・パート</option>
+                            <option value="契約社員">契約社員</option>
+                            <option value="業務委託">業務委託</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">応募資格</label>
+                        <input type="text" name="qualification" class="w-full border border-gray-300 p-2 rounded-lg text-sm" placeholder="例：高卒以上、経験者歓迎">
+                    </div>
+                </div>
+                <div class="duplicate-warning hidden mt-2 text-rose-600 text-[10px] font-bold">⚠ 同じ雇用形態・職種の案件が既に存在します。</div>
+            </section>
+
+            <!-- 2. 給与・特徴 -->
+            <section class="bg-white rounded-xl border border-slate-200 p-4">
+                <h3 class="text-xs font-bold text-slate-700 mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-emerald-500 rounded-full inline-block"></span>2. 給与・特徴</h3>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-5">
+                    <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">給与種別</label>
+                            <select name="salary_type" class="w-full border border-gray-200 p-2 rounded-lg text-sm bg-slate-50">
+                                <option value="月給">月給</option><option value="時給">時給</option><option value="年俸">年俸</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">給与下限</label>
+                            <div class="relative"><input type="number" name="salary_min" class="w-full border border-gray-200 p-2 pr-7 rounded-lg text-sm" placeholder="250000"><span class="absolute right-2 top-2 text-slate-400 text-xs">円</span></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">給与上限</label>
+                            <div class="relative"><input type="number" name="salary_max" class="w-full border border-gray-200 p-2 pr-7 rounded-lg text-sm" placeholder="450000"><span class="absolute right-2 top-2 text-slate-400 text-xs">円</span></div>
+                        </div>
+                        <div class="sm:col-span-3 space-y-2">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase">給与備考 (CSV項目)</label>
+                            <div><label class="text-[10px] font-bold text-indigo-500">自動生成</label>
+                            <textarea name="salary_note_auto" readonly class="w-full bg-slate-50 border border-indigo-100 p-2 rounded-lg text-xs min-h-[60px]"></textarea></div>
+                            <div><label class="text-[10px] font-bold text-slate-400">自由記入</label>
+                            <textarea name="salary_note_manual" oninput="updateSalaryNoteFromManual(this)" class="w-full border border-slate-200 p-2 rounded-lg text-xs min-h-[70px]" placeholder="例：経験・能力を考慮"></textarea></div>
+                            <input type="hidden" name="salary_note">
+                        </div>
+                    </div>
+                    <div class="md:col-span-4">
+                        <div class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 space-y-3 h-full">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[10px] font-bold text-indigo-700 uppercase">固定残業代 補助</label>
+                                <div class="flex bg-white p-0.5 rounded-lg border border-indigo-100">
+                                    <label class="flex items-center px-2 py-1 rounded text-[10px] cursor-pointer has-[:checked]:bg-indigo-600 has-[:checked]:text-white"><input type="radio" name="helper_enabled_radio" value="yes" class="hidden" onchange="handleHelperChange(this)"> あり</label>
+                                    <label class="flex items-center px-2 py-1 rounded text-[10px] cursor-pointer has-[:checked]:bg-indigo-600 has-[:checked]:text-white"><input type="radio" name="helper_enabled_radio" value="none" class="hidden" onchange="handleHelperChange(this)"> なし</label>
+                                    <label class="flex items-center px-2 py-1 rounded text-[10px] cursor-pointer has-[:checked]:bg-indigo-600 has-[:checked]:text-white"><input type="radio" name="helper_enabled_radio" value="no" checked class="hidden" onchange="handleHelperChange(this)"> 未設定</label>
+                                    <input type="hidden" name="helper_enabled" value="no">
+                                </div>
+                            </div>
+                            <div class="helper-fields hidden space-y-2 pt-2 border-t border-indigo-100">
+                                <div><label class="block text-xs text-indigo-600 mb-1">金額（円）</label><input type="number" name="fixed_amount" oninput="updateSalaryNote(this)" class="w-full px-2 py-1.5 text-xs border border-indigo-100 rounded-lg"></div>
+                                <div><label class="block text-xs text-indigo-600 mb-1">時間（h）</label><input type="number" name="fixed_hours" oninput="updateSalaryNote(this)" class="w-full px-2 py-1.5 text-xs border border-indigo-100 rounded-lg"></div>
+                                <div><label class="block text-xs text-indigo-600 mb-1">超過分の支給条件</label><input type="text" name="fixed_condition" oninput="updateSalaryNote(this)" value="超過分は別途全額支給します" class="w-full px-2 py-1.5 text-xs border border-indigo-100 rounded-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase">特徴・給与詳細</p>
+                    <div class="flex flex-wrap gap-1.5 text-xs">
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="char_no_resume"> 履歴書不要</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="char_new_grad"> 新卒歓迎</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="char_inexperienced"> 未経験者歓迎</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="char_independent"> 独立希望者歓迎</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="char_experienced"> 経験者優遇</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_bonus"> 賞与あり</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_rise"> 昇給あり</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_dorm"> 寮・住宅手当</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_train_full"> 交通費全額</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_family"> 家族手当</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_skill"> 資格手当</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_incentive"> インセンティブ</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_retire"> 退職金</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_daily"> 日払いOK</label>
+                        <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_fuyo"> 扶養内OK</label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. 勤務時間・休日 -->
+            <section>
+                <h3 class="text-xs font-bold text-slate-700 mb-3 border-l-4 border-orange-500 pl-2">3. 勤務時間・休日</h3>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">勤務時間（説明）</label>
+                    <input type="text" name="work_time_text" class="w-full border border-gray-300 p-2 rounded-lg text-sm" placeholder="10:00〜23:00（シフト制、実働8h）">
+                </div>
+                <div class="flex flex-wrap gap-1.5 text-xs mb-3">
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="work_lunch"> ランチのみ</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="work_train"> 終電考慮</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="work_w"> 副業・WワークOK</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="work_full"> フルタイム歓迎</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="work_ot"> 残業月20h以内</label>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-slate-600 mb-1 required-badge">休日・休暇（説明）</label>
+                    <input type="text" name="holiday_text" class="w-full border border-gray-300 p-2 rounded-lg text-sm" placeholder="月8日休み、夏季・冬季休暇あり">
+                </div>
+                <div class="flex flex-wrap gap-1.5 text-xs">
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_8"> 月8日以上</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_9"> 月9日以上</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_2"> 完全週休2日</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_baby"> 産休・育休</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_summer"> 夏季休暇</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_winter"> 年末年始</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_gw"> GW休暇</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="hol_spec"> 特別休暇</label>
+                </div>
+            </section>
+
+            <!-- 4. 待遇・福利厚生 -->
+            <section>
+                <h3 class="text-xs font-bold text-slate-700 mb-3 border-l-4 border-indigo-500 pl-2">4. 待遇・福利厚生</h3>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-slate-600 mb-1">待遇・福利厚生（説明）</label>
+                    <input type="text" name="ben_text" class="w-full border border-gray-300 p-2 rounded-lg text-sm" placeholder="社会保険完備、まかないありなど">
+                </div>
+                <div class="flex flex-wrap gap-1.5 text-xs">
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_makanai"> まかないあり</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_ins"> 社会保険完備</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_uniform"> 制服貸与</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_training"> 研修充実</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_overseas"> 海外研修</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_visit"> 生産者訪問</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_license"> 資格取得支援</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_car"> 車・バイク通勤OK</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_emp"> 社員登用あり</label>
+                    <label class="flex items-center gap-1 border p-1.5 rounded-lg bg-slate-50 cursor-pointer hover:bg-blue-50"><input type="checkbox" name="ben_hair"> 髪型自由</label>
+                </div>
+            </section>
+
+            <!-- 5. スキル・知識 -->
+            <section class="bg-slate-50 p-3 rounded-xl">
+                <h3 class="text-xs font-bold text-slate-700 mb-3">5. 身につくスキル・学べる知識</h3>
+                <div class="space-y-3">
+                    <div><p class="text-[10px] font-bold text-slate-400 mb-1.5">【技術・スキル】</p>
+                    <div class="flex flex-wrap gap-1.5 text-[11px]">
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_latte"> ラテアート</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_knife"> 包丁さばき</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_deco"> 飾り包丁</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_pizza"> ピザメイク</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_noodle"> 製麺</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_sushi"> 寿司技術</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_plating"> 盛り付け</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_bread"> 製パン</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_pastry"> 製菓</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_cocktail"> カクテル</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_premium"> 高級食材</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="sk_english"> 英会話</label>
+                    </div></div>
+                    <div><p class="text-[10px] font-bold text-slate-400 mb-1.5">【専門知識】</p>
+                    <div class="flex flex-wrap gap-1.5 text-[11px]">
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_wine"> ワイン</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_sake"> 日本酒</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_liquor"> お酒（リキュール・ウィスキーなど）</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_coffee"> コーヒー</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_tea"> お茶（日本茶・紅茶など）</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_meat"> 肉</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_fish"> 魚</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_vege"> 野菜</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_cheese"> チーズ</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_w_sweets"> 洋菓子</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_j_sweets"> 和菓子</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_tableware"> 食器</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_wedding"> 婚礼・パーティ</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_manner"> テーブルマナー</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="kn_kimono"> 着付け</label>
+                    </div></div>
+                    <div><p class="text-[10px] font-bold text-slate-400 mb-1.5">【ノウハウ】</p>
+                    <div class="flex flex-wrap gap-1.5 text-[11px]">
+                        <label class="flex items-center gap-1"><input type="checkbox" name="no_open"> 出店開業</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="no_mgmt"> 店舗運営</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="no_menu"> メニュー開発</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" name="no_stock"> 仕入れ・食材の目利き</label>
+                    </div></div>
+                </div>
+            </section>
+
+            <!-- 6. 仕事内容 -->
+            <section>
+                <label class="block text-xs font-bold text-slate-700 mb-2 required-badge">仕事内容・求める人物像</label>
+                <textarea name="content" class="w-full h-36 border border-gray-300 p-3 rounded-xl text-sm leading-relaxed" placeholder="仕事内容の詳細をご記入ください。"></textarea>
+            </section>
+
+        </div>
+    </div>
+</template>
+
+<!-- ===== SUCCESS MODAL ===== -->
+<div id="successModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-[100] px-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">送信完了！</h3>
+        <p class="text-gray-600 text-sm mb-1">クライアント：<span id="modalClient" class="font-bold text-gray-800"></span></p>
+        <p class="text-gray-500 text-xs mb-4">担当者より順次ご連絡いたします。</p>
+        <a id="modalFolderLink" href="#" target="_blank" class="hidden inline-block mb-4 text-sm text-blue-600 underline">Googleドライブで確認する →</a>
+        <button onclick="closeSuccessModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition">閉じる</button>
+    </div>
+</div>
+
+
+<script>
+// ===================================================
+// ▼▼▼ 設定エリア（再デプロイ時はここを編集）▼▼▼
+// ===================================================
+
+// 【GAS WebアプリのURL】
+// GASを再デプロイした場合は、下記の URL を新しいものに貼り替えてください。
+// 取得方法：
+//   GASスクリプト画面 → 上部「デプロイ」→「デプロイを管理」
+//   → 対象のデプロイ行の「ウェブアプリ」欄にあるURLをコピー
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyRMqcYrXE_Qk6Oek2lMRNcBLQ8ZFOQTnlHiHOKzozQc7Apy-MI64_NLNl1GJTsqRO8-Q/exec';
+
+// 【自動保存キー】（通常は変更不要）
+// ブラウザのlocalStorageに保存する際のキー名。
+// フォームのバージョンを上げた際に変更すると、古い保存データが引き継がれなくなります。
+const STORAGE_KEY = 'unified_form_v3_0_0';
+const CLIENT_KEY  = 'unified_client_v3_0_0';
+
+// 列順はメーカー指定のExcelテンプレートに準拠
+// 「待遇・福利厚生（説明）」はExcel非対応のため最終列に配置（媒体登録時に不要なら削除してください）
+const CSV_HEADERS = ["下書き原稿のID","職種","雇用形態","履歴書不要","新卒歓迎","未経験者歓迎","独立希望者歓迎","経験者優遇","給与","下限","上限","給与備考","ボーナス・賞与あり","昇給あり","寮・住宅手当あり","交通費全額支給","家族手当","資格手当・スキル手当","インセンティブ制度","退職金","日払いOK","扶養内OK","応募資格","勤務時間","ランチのお仕事","終電考慮","副業・ダブルワークOK","フルタイム歓迎","残業月20時間以内","休日・休暇","月8日以上休み","月9日以上休み","完全週休2日制","産休・育休","夏季休暇","年末年始休暇","GW休暇","特別休暇","待遇","まかない・食事補助あり","社会保険完備","制服貸与","研修が充実","海外研修","生産者訪問","資格取得支援","バイク・車通勤OK","社員登用制度","髪型自由","仕事内容・求める人材","ラテアート","包丁さばき","飾り包丁","ピザメイク","製麺","寿司技術","盛り付け技術","製パン技術","製菓技術","カクテル技法","高級食材の知識","英会話","ワインの知識","日本酒の知識","お酒（リキュール・ウィスキーなど)の知識","コーヒーの知識","お茶(日本茶・紅茶など)の知識","肉の知識","魚の知識","野菜の知識","チーズの知識","洋菓子の知識","和菓子の知識","食器の知識","婚礼料理・パーティーメニュー","テーブルマナー","着物の着付け","出店開業ノウハウ","店舗運営","メニュー開発","仕入れ・食材の目利き","待遇・福利厚生（説明）"];
+
+const CONFIG = {
+    prefs: ["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県","静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県","徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"],
+    categories: ["イタリアン","フレンチ","洋食","和食","日本料理・郷土料理","寿司","焼鳥・串焼き","中華料理","ラーメン","うどん・そば","カレー","焼肉・ホルモン","お好み焼き・たこ焼き","居酒屋","ダイニングバー","バー","パブ・スナック","カフェ・喫茶店","パン・ベーカリー","パティスリー・製菓","ファストフード","デリカテッセン・弁当","その他"],
+    priceOptions: ["指定なし","～500円","501円～1,000円","1,001円～1,500円","1,501円～2,000円","2,001円～3,000円","3,001円～4,000円","4,001円～5,000円","5,001円～7,000円","7,001円～10,000円","10,001円～15,000円","15,001円～20,000円","20,001円～30,000円","30,001円以上"],
+    seats: ["指定なし","10席未満","10席～20席","20席～30席","30席～50席","50席～100席","100席以上"],
+    smoking: ["全席禁煙","分煙（加熱式たばこ限定喫煙エリアあり）","分煙（喫煙専用室あり）","全席喫煙可"],
+    features: ["シニア・ミドル活躍中","定着率90%以上","一体感のある職場","快適な厨房環境","安定した上場・老舗企業","未経験歓迎","女性活躍中","外国人スタッフ活躍中"]
+};
+
+// ===================================================
+// 初期化
+// ===================================================
+window.onload = () => {
+    initDropdown('prefList', CONFIG.prefs);
+    initDropdown('categoryList1', CONFIG.categories);
+    initDropdown('categoryList2', CONFIG.categories);
+    initDropdown('priceLunchList', CONFIG.priceOptions);
+    initDropdown('priceDinnerList', CONFIG.priceOptions);
+    initDropdown('seatsList', CONFIG.seats);
+    initDropdown('smokingList', CONFIG.smoking);
+    initFeatures();
+    restoreClientInfo();
+    restoreAll();
+    setupAutoSave();
+
+    // 求人カード操作（イベント委譲）
+    document.getElementById('jobList').addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.classList.contains('delete-btn')) removeJob(btn);
+        else if (btn.classList.contains('copy-btn')) copyJob(btn);
+    });
+};
+
+function initDropdown(id, list) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    list.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = item;
+        el.appendChild(opt);
+    });
+}
+
+function initFeatures() {
+    const c = document.getElementById('featureContainer');
+    CONFIG.features.forEach(f => {
+        const lbl = document.createElement('label');
+        lbl.className = "flex items-center gap-2 text-xs text-gray-700 border p-2.5 rounded-xl hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition border-gray-200";
+        lbl.innerHTML = `<input type="checkbox" name="s_features" value="${f}" class="w-4 h-4 text-blue-600 rounded border-gray-300"> <span>${f}</span>`;
+        c.appendChild(lbl);
+    });
+}
+
+// ===================================================
+// タブ切り替え
+// ===================================================
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+// ===================================================
+// クライアント情報
+// ===================================================
+function saveClientInfo() {
+    localStorage.setItem(CLIENT_KEY, JSON.stringify({
+        company: document.getElementById('clientCompany').value,
+        shop: document.getElementById('clientShop').value
+    }));
+    document.getElementById('clientError').classList.add('hidden');
+}
+
+function restoreClientInfo() {
+    try {
+        const c = JSON.parse(localStorage.getItem(CLIENT_KEY) || '{}');
+        if (c.company) document.getElementById('clientCompany').value = c.company;
+        if (c.shop)    document.getElementById('clientShop').value    = c.shop;
+    } catch(e) {}
+}
+
+function getClientName() {
+    const co = document.getElementById('clientCompany').value.trim();
+    const sh = document.getElementById('clientShop').value.trim();
+    if (co && sh) return `${co}_${sh}`;
+    return co || sh || '';
+}
+
+function validateClient() {
+    const ok = getClientName() !== '';
+    document.getElementById('clientError').classList.toggle('hidden', ok);
+    return ok;
+}
+
+// ===================================================
+// 自動保存（フォーカスを奪わないよう遅延）
+// ===================================================
+let saveTimer = null;
+
+function setupAutoSave() {
+    // input系：800ms遅延（タイピング中にDOMを触らない）
+    document.addEventListener('input', e => {
+        if (e.target.closest('#jobList') || e.target.closest('#tab-store')) scheduleSave(800);
+    });
+    // change系（select, checkbox, radio）：即時
+    document.addEventListener('change', e => {
+        if (e.target.closest('#jobList') || e.target.closest('#tab-store')) scheduleSave(0);
+    });
+}
+
+function scheduleSave(delay) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persistAll, delay);
+}
+
+function persistAll() {
+    // 店舗情報
+    const storeData = {};
+    document.querySelectorAll('#tab-store input, #tab-store select, #tab-store textarea').forEach(el => {
+        if (!el.name) return;
+        if (el.type === 'checkbox') { if (!storeData[el.name]) storeData[el.name] = []; if (el.checked) storeData[el.name].push(el.value); }
+        else if (el.type === 'radio') { if (el.checked) storeData[el.name] = el.value; }
+        else storeData[el.name] = el.value;
+    });
+
+    // 求人条件
+    const jobData = Array.from(document.querySelectorAll('#jobList .job-card')).map(card => {
+        const d = {};
+        card.querySelectorAll('input, select, textarea').forEach(el => {
+            if (el.type === 'checkbox') d[el.name] = el.checked;
+            else if (el.type === 'radio') { if (el.checked) d[el.name] = el.value; }
+            else d[el.name] = el.value;
+        });
+        return d;
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ store: storeData, jobs: jobData }));
+    showSaveLabel();
+}
+
+function restoreAll() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) { addNewJob(); return; }
+        const { store = {}, jobs = [] } = JSON.parse(raw);
+
+        // 店舗情報を復元
+        Object.keys(store).forEach(k => {
+            if (k === 's_features') {
+                document.querySelectorAll('input[name="s_features"]').forEach(cb => {
+                    cb.checked = (store[k] || []).includes(cb.value);
+                });
+            } else if (k === 's_hiringReason') {
+                const r = document.querySelector(`input[name="s_hiringReason"][value="${store[k]}"]`);
+                if (r) r.checked = true;
+            } else {
+                const el = document.querySelector(`[name="${k}"]`);
+                if (el) el.value = store[k] || '';
+            }
+        });
+
+        // 求人条件を復元
+        if (jobs.length > 0) jobs.forEach(d => addNewJob(d, false));
+        else addNewJob();
+    } catch(e) { addNewJob(); }
+    updateNumbers();
+}
+
+function showSaveLabel() {
+    const el = document.getElementById('autoSaveLabel');
+    el.style.opacity = '1';
+    clearTimeout(showSaveLabel._t);
+    showSaveLabel._t = setTimeout(() => el.style.opacity = '0', 3000);
+}
+
+// ===================================================
+// 求人カード管理
+// ===================================================
+const jobList = document.getElementById ? null : null; // 遅延取得
+const template = () => document.getElementById('jobCardTemplate');
+
+function addNewJob(data = null, shouldSave = true) {
+    const list = document.getElementById('jobList');
+    const card = template().content.cloneNode(true).firstElementChild;
+    list.appendChild(card);
+    updateNumbers();
+
+    if (data) {
+        Object.keys(data).forEach(k => {
+            if (k === 'helper_enabled_radio') return;
+            card.querySelectorAll(`[name="${k}"]`).forEach(el => {
+                if (el.type === 'checkbox') el.checked = !!data[k];
+                else if (el.type === 'radio') el.checked = (el.value === data[k]);
+                else el.value = data[k] || '';
+            });
+        });
+        const hv = data['helper_enabled'] || 'no';
+        card.querySelector('[name="helper_enabled"]').value = hv;
+        setHelperRadio(card, hv);
+        if (hv === 'yes') card.querySelector('.helper-fields').classList.remove('hidden');
+        const noteVal = data['salary_note'] || '';
+        if (noteVal) parseSalaryNoteIntoFields(card, noteVal);
+    }
+    validateDuplicates();
+    if (shouldSave) scheduleSave(0);
+}
+
+function removeJob(btn) {
+    btn.closest('.job-card').remove();
+    updateNumbers(); validateDuplicates(); scheduleSave(0);
+}
+
+function copyJob(btn) {
+    const card = btn.closest('.job-card');
+    const d = {};
+    card.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.type === 'checkbox') d[el.name] = el.checked;
+        else if (el.type === 'radio') { if (el.checked) d[el.name] = el.value; }
+        else d[el.name] = el.value;
+    });
+    addNewJob(d);
+}
+
+function updateNumbers() {
+    const list = document.getElementById('jobList');
+    const empty = document.getElementById('emptyState');
+    list.querySelectorAll('.job-card').forEach((c, i) => {
+        c.querySelector('.card-number').innerText = `案件 #${i + 1}`;
+        c.querySelectorAll('input[type="radio"][name^="helper_enabled_radio"]').forEach(r => r.name = `helper_enabled_radio_${i}`);
+    });
+    empty.classList.toggle('hidden', list.children.length > 0);
+}
+
+function validateDuplicates() {
+    const seen = new Set();
+    document.querySelectorAll('#jobList .job-card').forEach(c => {
+        const k = `${c.querySelector('.job-title-input').value}-${c.querySelector('.employment-type-input').value}`;
+        const warn = c.querySelector('.duplicate-warning');
+        if (seen.has(k)) { warn.classList.remove('hidden'); c.classList.add('duplicate-error'); }
+        else { seen.add(k); warn.classList.add('hidden'); c.classList.remove('duplicate-error'); }
+    });
+}
+
+function handleInputChange() { validateDuplicates(); scheduleSave(0); }
+
+// ===================================================
+// 固定残業代補助
+// ===================================================
+function handleHelperChange(radio) {
+    const card = radio.closest('.job-card');
+    const box  = card.querySelector('.helper-fields');
+    const hid  = card.querySelector('[name="helper_enabled"]');
+    if (radio.value === 'yes') { box.classList.remove('hidden'); hid.value = 'yes'; }
+    else { box.classList.add('hidden'); hid.value = radio.value; }
+    if (radio.value !== 'yes') card.querySelector('[name="salary_note_auto"]').value = '';
+    rebuildSalaryNote(card);
+    scheduleSave(0);
+}
+
+function updateSalaryNote(el) { rebuildSalaryNote(el.closest('.job-card')); scheduleSave(0); }
+function updateSalaryNoteFromManual(el) { rebuildSalaryNote(el.closest('.job-card')); scheduleSave(0); }
+
+function rebuildSalaryNote(card) {
+    const hv   = card.querySelector('[name="helper_enabled"]').value;
+    const auto = card.querySelector('[name="salary_note_auto"]');
+    const man  = card.querySelector('[name="salary_note_manual"]');
+    const hid  = card.querySelector('[name="salary_note"]');
+    let a = '';
+    if (hv === 'yes') {
+        const amt  = card.querySelector('[name="fixed_amount"]').value;
+        const hrs  = card.querySelector('[name="fixed_hours"]').value;
+        const cond = card.querySelector('[name="fixed_condition"]').value;
+        if (amt && hrs) a = `【固定残業代情報】\n固定残業代${amt}円（${hrs}時間分）を含む\n${cond}`;
+    } else if (hv === 'none') { a = '固定残業代なし'; }
+    auto.value = a;
+    const m = man.value.trim();
+    hid.value = a + (a && m ? '\n\n' : '') + m;
+}
+
+function parseSalaryNoteIntoFields(card, noteVal) {
+    const ap = /^【固定残業代情報】\n固定残業代(\d+)円（(\d+)時間分）を含む\n(.+?)(?:\n\n|$)/s;
+    const np = /^固定残業代なし/;
+    let autoText = '', manText = noteVal;
+    if (ap.test(noteVal)) {
+        const m = noteVal.match(ap);
+        autoText = m[0].replace(/\n\n$/, '');
+        manText  = noteVal.slice(autoText.length).replace(/^\n\n/, '');
+        card.querySelector('[name="fixed_amount"]').value    = m[1];
+        card.querySelector('[name="fixed_hours"]').value     = m[2];
+        card.querySelector('[name="fixed_condition"]').value = m[3].trim();
+        setHelperRadio(card, 'yes');
+        card.querySelector('.helper-fields').classList.remove('hidden');
+        card.querySelector('[name="helper_enabled"]').value = 'yes';
+    } else if (np.test(noteVal)) {
+        autoText = '固定残業代なし'; manText = noteVal.slice(autoText.length).replace(/^\n\n/, '');
+        setHelperRadio(card, 'none');
+        card.querySelector('.helper-fields').classList.add('hidden');
+        card.querySelector('[name="helper_enabled"]').value = 'none';
+    } else {
+        setHelperRadio(card, 'no');
+        card.querySelector('[name="helper_enabled"]').value = 'no';
+    }
+    card.querySelector('[name="salary_note_auto"]').value   = autoText;
+    card.querySelector('[name="salary_note_manual"]').value = manText;
+    card.querySelector('[name="salary_note"]').value        = noteVal;
+}
+
+function setHelperRadio(card, val) {
+    card.querySelectorAll('[name^="helper_enabled_radio"]').forEach(r => r.checked = (r.value === val));
+}
+
+// ===================================================
+// CSV
+// ===================================================
+function buildCSVContent() {
+    const rows = [CSV_HEADERS.join(',')];
+    document.querySelectorAll('#jobList .job-card').forEach(c => {
+        const get = n => (c.querySelector(`[name="${n}"]`)?.value || '').replace(/"/g,'""');
+        const chk = n => c.querySelector(`[name="${n}"]`)?.checked ? '〇' : '';
+        const benMap = {'ben_makanai':'まかない・食事補助あり','ben_ins':'社会保険完備','ben_uniform':'制服貸与','ben_training':'研修充実','ben_overseas':'海外研修','ben_visit':'生産者訪問','ben_license':'資格取得支援','ben_car':'車・バイク通勤OK','ben_emp':'社員登用あり','ben_hair':'髪型自由'};
+        const benLabels = Object.entries(benMap).filter(([k])=>c.querySelector(`[name="${k}"]`)?.checked).map(([,v])=>v);
+        const r = ['',`"${get('job_title')}"`,`"${get('employment_type')}"`,chk('char_no_resume'),chk('char_new_grad'),chk('char_inexperienced'),chk('char_independent'),chk('char_experienced'),`"${get('salary_type')}"`,get('salary_min'),get('salary_max'),`"${get('salary_note').replace(/\n/g,' ')}"`,chk('ben_bonus'),chk('ben_rise'),chk('ben_dorm'),chk('ben_train_full'),chk('ben_family'),chk('ben_skill'),chk('ben_incentive'),chk('ben_retire'),chk('ben_daily'),chk('ben_fuyo'),`"${get('qualification')}"`,`"${get('work_time_text')}"`,chk('work_lunch'),chk('work_train'),chk('work_w'),chk('work_full'),chk('work_ot'),`"${get('holiday_text')}"`,chk('hol_8'),chk('hol_9'),chk('hol_2'),chk('hol_baby'),chk('hol_summer'),chk('hol_winter'),chk('hol_gw'),chk('hol_spec'),`"${benLabels.join('／')}"`,chk('ben_makanai'),chk('ben_ins'),chk('ben_uniform'),chk('ben_training'),chk('ben_overseas'),chk('ben_visit'),chk('ben_license'),chk('ben_car'),chk('ben_emp'),chk('ben_hair'),`"${get('content').replace(/\n/g,'<br>')}"`,chk('sk_latte'),chk('sk_knife'),chk('sk_deco'),chk('sk_pizza'),chk('sk_noodle'),chk('sk_sushi'),chk('sk_plating'),chk('sk_bread'),chk('sk_pastry'),chk('sk_cocktail'),chk('sk_premium'),chk('sk_english'),chk('kn_wine'),chk('kn_sake'),chk('kn_liquor'),chk('kn_coffee'),chk('kn_tea'),chk('kn_meat'),chk('kn_fish'),chk('kn_vege'),chk('kn_cheese'),chk('kn_w_sweets'),chk('kn_j_sweets'),chk('kn_tableware'),chk('kn_wedding'),chk('kn_manner'),chk('kn_kimono'),chk('no_open'),chk('no_mgmt'),chk('no_menu'),chk('no_stock'),`"${get('ben_text')}"`];
+        rows.push(r.join(','));
+    });
+    return '\uFEFF' + rows.join('\n');
+}
+
+function downloadCSV() {
+    if (!validateClient()) return;
+    const cn   = getClientName();
+    const date = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
+    const b    = new Blob([buildCSVContent()], {type:'text/csv;charset=utf-8;'});
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(b);
+    a.download = `求人原稿_${cn}_${date}.csv`;
+    a.click();
+}
+
+function handleCSVUpload(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const jobs = parseCSV(ev.target.result);
+            if (!confirm(`${jobs.length}件を読み込みます。既存の求人データを上書きしますか？`)) return;
+            const chks = ['char_no_resume','char_new_grad','char_inexperienced','char_independent','char_experienced','ben_bonus','ben_rise','ben_dorm','ben_train_full','ben_family','ben_skill','ben_incentive','ben_retire','ben_daily','ben_fuyo','work_lunch','work_train','work_w','work_full','work_ot','hol_8','hol_9','hol_2','hol_baby','hol_summer','hol_winter','hol_gw','hol_spec','ben_makanai','ben_ins','ben_uniform','ben_training','ben_overseas','ben_visit','ben_license','ben_car','ben_emp','ben_hair','sk_latte','sk_knife','sk_deco','sk_pizza','sk_noodle','sk_sushi','sk_plating','sk_bread','sk_pastry','sk_cocktail','sk_premium','sk_english','kn_wine','kn_sake','kn_liquor','kn_coffee','kn_tea','kn_meat','kn_fish','kn_vege','kn_cheese','kn_w_sweets','kn_j_sweets','kn_tableware','kn_wedding','kn_manner','kn_kimono','no_open','no_mgmt','no_menu','no_stock'];
+            jobs.forEach(j => { chks.forEach(f => { const v=String(j[f]||'').toLowerCase(); j[f]=['1','true','yes','〇','◯','○'].includes(v); }); delete j['helper_enabled']; });
+            document.getElementById('jobList').innerHTML = '';
+            jobs.forEach(j => addNewJob(j, false));
+            scheduleSave(0);
+        } catch(err) { alert('CSV解析エラー: ' + err.message); }
+    };
+    r.readAsText(file, 'utf-8');
+    e.target.value = '';
+}
+
+function parseCSV(txt) {
+    const lines = txt.split('\n').filter(l => l.trim());
+    const headers = parseLine(lines[0]);
+    return lines.slice(1).map(l => { const vals = parseLine(l); const d = {}; headers.forEach((h,i) => { const f = mapHeader(h); if (f) d[f] = vals[i]||''; }); return d; });
+}
+function parseLine(l) {
+    const res=[]; let cur='',q=false;
+    for (let i=0;i<l.length;i++) { if(l[i]==='"'){if(q&&l[i+1]==='"'){cur+='"';i++;}else q=!q;} else if(l[i]===','&&!q){res.push(cur.trim());cur='';} else cur+=l[i]; }
+    res.push(cur.trim()); return res;
+}
+function mapHeader(h) {
+    const m = {'職種':'job_title','雇用形態':'employment_type','応募資格':'qualification','給与':'salary_type','下限':'salary_min','上限':'salary_max','給与備考':'salary_note','履歴書不要':'char_no_resume','新卒歓迎':'char_new_grad','未経験者歓迎':'char_inexperienced','独立希望者歓迎':'char_independent','経験者優遇':'char_experienced','ボーナス・賞与あり':'ben_bonus','昇給あり':'ben_rise','寮・住宅手当あり':'ben_dorm','交通費全額支給':'ben_train_full','家族手当':'ben_family','資格手当・スキル手当':'ben_skill','インセンティブ制度':'ben_incentive','退職金':'ben_retire','日払いOK':'ben_daily','扶養内OK':'ben_fuyo','勤務時間':'work_time_text','ランチのお仕事':'work_lunch','終電考慮':'work_train','副業・ダブルワークOK':'work_w','フルタイム歓迎':'work_full','残業月20時間以内':'work_ot','休日・休暇':'holiday_text','月8日以上休み':'hol_8','月9日以上休み':'hol_9','完全週休2日制':'hol_2','産休・育休':'hol_baby','夏季休暇':'hol_summer','年末年始休暇':'hol_winter','GW休暇':'hol_gw','特別休暇':'hol_spec','待遇・福利厚生（説明）':'ben_text','まかない・食事補助あり':'ben_makanai','社会保険完備':'ben_ins','制服貸与':'ben_uniform','研修が充実':'ben_training','海外研修':'ben_overseas','生産者訪問':'ben_visit','資格取得支援':'ben_license','バイク・車通勤OK':'ben_car','社員登用制度':'ben_emp','髪型自由':'ben_hair','仕事内容・求める人材':'content','ラテアート':'sk_latte','包丁さばき':'sk_knife','飾り包丁':'sk_deco','ピザメイク':'sk_pizza','製麺':'sk_noodle','寿司技術':'sk_sushi','盛り付け技術':'sk_plating','製パン技術':'sk_bread','製菓技術':'sk_pastry','カクテル技法':'sk_cocktail','高級食材の知識':'sk_premium','英会話':'sk_english','ワインの知識':'kn_wine','日本酒の知識':'kn_sake','お酒の知識':'kn_liquor','コーヒーの知識':'kn_coffee','お茶の知識':'kn_tea','肉の知識':'kn_meat','魚の知識':'kn_fish','野菜の知識':'kn_vege','チーズの知識':'kn_cheese','洋菓子の知識':'kn_w_sweets','和菓子の知識':'kn_j_sweets','食器の知識':'kn_tableware','婚礼料理・パーティーメニュー':'kn_wedding','テーブルマナー':'kn_manner','着物の着付け':'kn_kimono','出店開業ノウハウ':'no_open','店舗運営':'no_mgmt','メニュー開発':'no_menu','仕入れ・食材調達':'no_stock'};
+    return m[h]||null;
+}
+
+// ===================================================
+// 送信処理
+// ===================================================
+async function submitAll() {
+    if (!validateClient()) { switchTab('store', document.querySelectorAll('.tab-btn')[0]); return; }
+    if (GAS_URL.includes('YOUR_SCRIPT_ID')) { alert('GAS_URL が設定されていません。'); return; }
+
+    const clientName = getClientName();
+    const date = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
+
+    // 店舗情報を収集
+    const storeData = { formType: 'unified', clientName };
+    document.querySelectorAll('#tab-store input, #tab-store select, #tab-store textarea').forEach(el => {
+        if (!el.name) return;
+        if (el.type === 'checkbox') { if (!storeData[el.name]) storeData[el.name] = []; if (el.checked) storeData[el.name].push(el.value); }
+        else if (el.type === 'radio') { if (el.checked) storeData[el.name] = el.value; }
+        else storeData[el.name] = el.value;
+    });
+    storeData.submittedAt = new Date().toLocaleString('ja-JP');
+
+    const csvContent  = buildCSVContent();
+    const csvFileName = `求人原稿_${clientName}_${date}.csv`;
+
+    const btn = document.querySelector('button[onclick="submitAll()"]');
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="spin">⟳</span> 送信中…';
+    btn.disabled = true;
+
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors', // GASのCORS制限を回避。レスポンスは読めないが送信は届く。
+            headers: { 'Content-Type': 'text/plain' }, // no-corsではapplication/jsonが使えないためtext/plainに変更
+            body: JSON.stringify({ formType: 'unified', clientName, storeData, csvContent, csvFileName })
+        });
+        // no-corsではレスポンスの中身が読めないため、送信完了とみなしてモーダルを表示する
+        // ※ 実際にGASで処理が成功したかはGoogleドライブ・通知メールで確認してください
+        document.getElementById('modalClient').textContent = clientName;
+        document.getElementById('modalFolderLink').classList.add('hidden');
+        document.getElementById('successModal').classList.remove('hidden');
+        localStorage.removeItem(STORAGE_KEY);
+    } catch(err) {
+        alert('❌ 通信エラー: ' + err.message);
+    } finally {
+        btn.innerHTML = origHTML;
+        btn.disabled = false;
+    }
+}
+
+function closeSuccessModal() {
+    document.getElementById('successModal').classList.add('hidden');
+}
+</script>
+</body>
+</html>

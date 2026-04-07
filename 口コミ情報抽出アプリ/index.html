@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口コミ統合分析ツール</title>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 日本語のフォント設定 */
+        body {
+            font-family: 'Inter', 'Noto Sans Japanese', sans-serif;
+            background-color: #f7f9fb;
+        }
+        /* ボタンのアニメーション */
+        .btn-primary {
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 100, 255, 0.3);
+        }
+        .loading-spinner {
+            border-top-color: #3b82f6;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .benefit-card {
+            background-color: #fff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .benefit-card:hover {
+            transform: translateY(-2px);
+        }
+
+        /* AIチャットウィジェットのスタイル */
+        #chatWidgetContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        /* 【重要】chatWindowが初期状態で確実に非表示になるようにCSSで定義 */
+        #chatWindow.hidden {
+            display: none !important; 
+        }
+
+        #chatWindow {
+            width: 350px;
+            height: 450px;
+            max-width: 90vw;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        #chatHistoryArea {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f7f9fb;
+        }
+        .message {
+            margin-bottom: 10px;
+            max-width: 85%;
+        }
+        .user-message {
+            margin-left: auto;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 10px 10px 0 10px;
+            padding: 8px 12px;
+            word-break: break-word;
+        }
+        .ai-message {
+            margin-right: auto;
+            background-color: #e5e7eb;
+            color: #1f2937;
+            border-radius: 10px 10px 10px 0;
+            padding: 8px 12px;
+            word-break: break-word;
+        }
+        .chat-loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, .3);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl shadow-2xl">
+        
+        <!-- タイトルと分析深度コントロール -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b-2 pb-2">
+            <h1 class="text-3xl font-bold text-gray-800 mb-3 md:mb-0">
+                口コミ統合分析ツール (求人広告原稿向け)
+            </h1>
+            
+            <!-- NEW: 分析深度設定 -->
+            <div class="flex items-center space-x-2">
+                <label for="analysisDepthSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap">分析深度:</label>
+                <select id="analysisDepthSelect" class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="standard">標準 (約200字/項目)</option>
+                    <option value="detailed">詳細 (約400字/項目)</option>
+                    <option value="in-depth">深掘り (約600字/項目)</option>
+                </select>
+            </div>
+        </div>
+
+        <p class="text-gray-600 mb-6">
+            複数の口コミテキストを貼り付け、「分析する」ボタンを押してください。AIが求人広告の紹介文作成に役立つ**「お店の魅力」**と**「特徴」**を抽出します。
+        </p>
+
+        <!-- 入力エリア -->
+        <div class="mb-6">
+            <!-- お店名の入力フィールド -->
+            <label for="shopNameInput" class="block text-lg font-medium text-gray-700 mb-2">お店の名前（任意）</label>
+            <input type="text" id="shopNameInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 mb-4" placeholder="例：〇〇ダイニング 恵比寿店">
+
+            <label for="reviewInput" class="block text-lg font-medium text-gray-700 mb-2">口コミテキストの貼り付け</label>
+            <textarea id="reviewInput" rows="10" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" placeholder="ここに複数の口コミをまとめて貼り付けてください..."></textarea>
+        </div>
+
+        <!-- ボタンコンテナ (上部) -->
+        <div class="flex flex-col md:flex-row gap-4">
+            <button id="analyzeButton" class="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg btn-primary shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50" onclick="analyzeReviews()">
+                口コミを分析する
+            </button>
+            <button id="resetButton" class="w-full md:w-auto px-6 py-3 bg-red-500 text-white font-semibold rounded-lg btn-primary shadow-md hover:bg-red-600 focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50" onclick="showResetConfirmation()">
+                すべてリセット
+            </button>
+            <button id="downloadButtonTop" class="w-full md:w-auto px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg btn-primary shadow-md hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50 hidden" onclick="downloadResults()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L10 11.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v7a1 1 0 11-2 0V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                結果をダウンロード (TXT)
+            </button>
+        </div>
+
+        <!-- 結果表示エリア -->
+        <div id="resultsArea" class="mt-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">分析結果 (求人原稿作成用)</h2>
+            <div id="loadingIndicator" class="hidden flex items-center justify-center p-8 bg-blue-50 rounded-lg shadow-inner">
+                <div class="loading-spinner h-6 w-6 border-4 border-gray-200 rounded-full mr-3"></div>
+                <span class="text-blue-600 font-medium">AIが口コミを分析中です...</span>
+            </div>
+            <div id="analysisResult" class="min-h-[150px] bg-gray-50 p-6 rounded-lg shadow-inner border border-gray-200 hidden">
+                <!-- 分析結果がここに挿入されます -->
+            </div>
+        </div>
+
+        <!-- ペルソナ設定コントロールエリア -->
+        <div id="personaControls" class="mt-8 hidden">
+            <h2 class="text-xl font-semibold text-gray-800 mb-2">採用ペルソナ設定</h2>
+            <div class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="flex-grow w-full">
+                    <label for="targetRoleInput" class="block text-sm font-medium text-gray-700">ターゲット職種/雇用形態</label>
+                    <input type="text" id="targetRoleInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 transition duration-150" placeholder="例：アルバイト・ホールスタッフ、正社員・調理補助">
+                </div>
+                <button id="personaButton" class="w-full md:w-auto px-6 py-3 bg-pink-600 text-white font-semibold rounded-lg btn-primary shadow-md hover:bg-pink-700 focus:outline-none focus:ring-4 focus:ring-pink-500 focus:ring-opacity-50 flex-shrink-0" onclick="generatePersona()">
+                    採用ペルソナを設定/再設定する
+                </button>
+            </div>
+        </div>
+        
+        <!-- ペルソナ結果表示エリア -->
+        <div id="personaResult" class="mt-8 hidden">
+             <!-- ペルソナ結果がここに挿入されます -->
+        </div>
+
+        <!-- 最下部のダウンロードボタン -->
+        <div id="downloadBottomContainer" class="mt-8 pt-6 border-t border-gray-200 text-center hidden">
+            <button id="downloadButtonBottom" class="w-full md:w-auto px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg btn-primary shadow-md hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50" onclick="downloadResults()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L10 11.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v7a1 1 0 11-2 0V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                分析結果とペルソナをダウンロード (TXT)
+            </button>
+        </div>
+
+        <!-- エラー/情報メッセージ -->
+        <div id="messageBox" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg transition duration-150" role="alert">
+            <!-- エラーメッセージがここに挿入されます -->
+        </div>
+    </div>
+    
+    <!-- AIチャットウィジェットの追加 -->
+    <div id="chatWidgetContainer">
+        <!-- AIチャットを開くボタン -->
+        <!-- FIX: onclick="toggleChat()" を指定 -->
+        <button id="toggleChatButton" class="w-16 h-16 bg-pink-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl font-bold btn-primary hover:bg-pink-600 focus:outline-none focus:ring-4 focus:ring-pink-500 focus:ring-opacity-50" onclick="toggleChat()">
+            AI
+        </button>
+        <!-- チャットウィンドウ本体 (初期は非表示: hiddenクラスが付与されています) -->
+        <div id="chatWindow" class="mt-2 hidden">
+            <!-- ヘッダー -->
+            <div class="p-3 bg-pink-500 text-white font-semibold rounded-t-lg flex justify-between items-center">
+                <span>AIリライトアシスタント</span>
+                <!-- 閉じるボタン -->
+                <button onclick="toggleChat()" class="text-white hover:text-pink-100">&times;</button>
+            </div>
+            <!-- メッセージ履歴 -->
+            <div id="chatHistoryArea">
+                <div class="message ai-message">
+                    口コミ分析が完了したら、チャットで文章のリライトやアイデア出しをサポートします！
+                </div>
+            </div>
+            <!-- 入力フォーム -->
+            <div class="p-3 border-t flex">
+                <input type="text" id="chatInput" class="w-full p-2 border border-gray-300 rounded-l-lg focus:outline-none" placeholder="メッセージを入力...">
+                <button id="chatSendButton" class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 disabled:bg-gray-400" onclick="sendMessage()">
+                    送信
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- リセット確認モーダル -->
+    <div id="resetConfirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm transform transition-all duration-300 ease-in-out scale-100">
+            <h3 class="text-2xl font-bold text-red-600 mb-4 border-b pb-2">データ消去の確認</h3>
+            <p class="text-gray-700 mb-6">
+                入力された**口コミ**、**お店の名前**、**分析結果**、**ペルソナ設定**、**チャット履歴**をすべてクリアします。
+                この操作は元に戻せません。よろしいですか？
+            </p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelResetButton" class="px-5 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition duration-150">
+                    キャンセル
+                </button>
+                <button id="confirmResetButton" class="px-5 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition duration-150">
+                    すべて消去する
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // Firebaseの認証情報とアプリIDはCanvas環境から提供されます
+        // 外部APIキーは提供された環境に自動で設定されます
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // UI要素の取得
+        const shopNameInput = document.getElementById('shopNameInput');
+        const reviewInput = document.getElementById('reviewInput');
+        const analysisDepthSelect = document.getElementById('analysisDepthSelect'); // NEW: 分析深度セレクタ
+        const analyzeButton = document.getElementById('analyzeButton');
+        const resetButton = document.getElementById('resetButton');
+        const downloadButtonTop = document.getElementById('downloadButtonTop');
+        const downloadBottomContainer = document.getElementById('downloadBottomContainer');
+        const downloadButtonBottom = document.getElementById('downloadButtonBottom');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const analysisResult = document.getElementById('analysisResult');
+        const messageBox = document.getElementById('messageBox');
+        
+        // ペルソナ関連要素の取得
+        const personaControls = document.getElementById('personaControls');
+        const targetRoleInput = document.getElementById('targetRoleInput'); 
+        const personaButton = document.getElementById('personaButton');
+        const personaResult = document.getElementById('personaResult');
+
+        // AIチャット関連要素の取得
+        const toggleChatButton = document.getElementById('toggleChatButton');
+        const chatWindow = document.getElementById('chatWindow');
+        const chatHistoryArea = document.getElementById('chatHistoryArea');
+        const chatInput = document.getElementById('chatInput');
+        const chatSendButton = document.getElementById('chatSendButton');
+        
+        // リセットモーダル要素の取得
+        const resetConfirmationModal = document.getElementById('resetConfirmationModal');
+        const confirmResetButton = document.getElementById('confirmResetButton');
+        const cancelResetButton = document.getElementById('cancelResetButton');
+
+        
+        // 状態変数
+        let lastAnalysisData = null; // 最新の分析結果データを保持する変数
+        let lastPersonaData = null; // 最新のペルソナデータを保持する変数
+        let chatHistory = []; // 会話履歴を保持する配列
+        
+        /**
+         * チャットウィンドウの表示・非表示を切り替える (ローカル関数として定義)
+         */
+        const toggleChat = function() {
+            // hiddenクラスをトグルすることで表示・非表示を切り替える
+            chatWindow.classList.toggle('hidden');
+        };
+
+        /**
+         * すべてのリセット処理を実行する（確認後）
+         */
+        const resetAllData = function() {
+            // 1. 入力エリアをクリア
+            shopNameInput.value = '';
+            reviewInput.value = '';
+            targetRoleInput.value = '';
+            
+            // 2. 結果エリアを非表示・クリア
+            analysisResult.style.display = 'none';
+            analysisResult.innerHTML = '';
+            personaResult.style.display = 'none';
+            personaResult.innerHTML = '';
+            personaControls.classList.add('hidden');
+            
+            // 3. ボタンの表示をリセット
+            downloadButtonTop.classList.add('hidden');
+            downloadBottomContainer.classList.add('hidden');
+            analyzeButton.disabled = false;
+            analyzeButton.textContent = '口コミを分析する';
+            
+            // 4. メッセージをクリア
+            messageBox.style.display = 'none';
+            
+            // 5. 状態変数をクリア
+            lastAnalysisData = null;
+            lastPersonaData = null;
+            
+            // 6. チャット履歴をリセット
+            chatHistory = [];
+            chatHistoryArea.innerHTML = `
+                <div class="message ai-message">
+                    口コミ分析が完了したら、チャットで文章のリライトやアイデア出しをサポートします！
+                </div>
+            `;
+            
+            // 7. モーダルを非表示
+            resetConfirmationModal.classList.add('hidden');
+
+            displayMessage('すべての入力と分析結果をリセットしました。', 'info');
+        }
+
+        /**
+         * リセット確認モーダルを表示する
+         */
+        const showResetConfirmation = function() {
+            resetConfirmationModal.classList.remove('hidden');
+        }
+
+        // HTMLのonclickからの呼び出しを可能にするため、グローバルなwindowオブジェクトに割り当て
+        window.toggleChat = toggleChat;
+        window.sendMessage = sendMessage;
+        window.analyzeReviews = analyzeReviews;
+        window.downloadResults = downloadResults;
+        window.generatePersona = generatePersona; 
+        window.showResetConfirmation = showResetConfirmation; 
+
+        // モーダルボタンのイベントリスナー設定
+        confirmResetButton.addEventListener('click', resetAllData);
+        cancelResetButton.addEventListener('click', () => {
+            resetConfirmationModal.classList.add('hidden');
+        });
+
+
+        /**
+         * メッセージボックスにエラーや情報を表示する
+         * @param {string} message - 表示するメッセージ
+         * @param {string} type - 'error' (デフォルト) または 'info'
+         */
+        function displayMessage(message, type = 'error') {
+            messageBox.textContent = message;
+            messageBox.className = `mt-4 p-4 rounded-lg transition duration-150 ${type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' : 'bg-green-100 border border-green-400 text-green-700'}`;
+            messageBox.style.display = 'block';
+        }
+
+        /**
+         * 指数バックオフを伴うFetchリトライ関数
+         * @param {string} url - API URL
+         * @param {object} options - Fetch options
+         * @param {number} retries - 残りのリトライ回数
+         */
+        async function fetchWithRetry(url, options, retries = 5) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 && i < retries - 1) {
+                        // Rate limit exceeded, retry with exponential backoff
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`APIリクエストが失敗しました: ${response.status} ${response.statusText}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        /**
+         * 分析結果とペルソナを整形してテキストとしてダウンロードする
+         */
+        function downloadResults() {
+            if (!lastAnalysisData) {
+                displayMessage('ダウンロードする分析結果がありません。先に口コミを分析してください。', 'error');
+                return;
+            }
+
+            const data = lastAnalysisData;
+            const persona = lastPersonaData;
+            const shopName = shopNameInput.value.trim() || '（店名未入力）';
+            
+            // データをテキスト形式に整形
+            let textContent = `
+========================================
+【口コミ統合分析結果】 (求人原稿作成用)
+========================================
+
+◆ 店名: ${shopName}
+◆ 総合評価: ${data.overall_rating}
+◆ 分析日: ${new Date().toLocaleString('ja-JP')}
+◆ 入力口コミ文字数: ${reviewInput.value.trim().length}文字
+◆ 分析深度: ${analysisDepthSelect.options[analysisDepthSelect.selectedIndex].text}
+
+----------------------------------------
+【詳細分類（原稿作成の基礎情報）】
+----------------------------------------
+
+1. 料理・商品の最大の魅力（原稿の核となる部分）:
+${data.menu_highlights}
+
+2. 雰囲気・接客の特徴（職場のイメージ）:
+${data.atmosphere_and_service}
+
+3. 主な客層（働く上で重要な情報）:
+${data.customer_segment}
+
+4. 改善点・課題（正直に伝えるべき情報）:
+${data.challenge_points}
+
+5. アクセス情報（通勤・訪問のしやすさ）:
+${data.access_information}
+
+6. 特筆すべきサービス・顧客体験:
+${data.special_services}
+
+7. 頻出キーワード:
+${data.keywords.join('、')}
+
+
+----------------------------------------
+【★ 働くメリット・身につくスキル (求職者向け)】
+----------------------------------------
+
+- 正社員向けメリット:
+${data.working_benefits.full_time_benefits}
+
+- アルバイト向けメリット:
+${data.working_benefits.part_time_benefits}
+
+- ホールスタッフ向けスキル:
+${data.working_benefits.hall_staff_skills}
+
+- 調理スタッフ向けスキル:
+${data.working_benefits.kitchen_staff_skills}
+
+----------------------------------------
+【★ 求人原稿作成向け最終案】
+----------------------------------------
+
+★ 求人原稿用：お店の総合紹介文 (200字程度):
+${data.recruitment_pitch}
+
+★ キャッチコピー案（3案）:
+1. ${data.catchphrase_suggestions[0] || '案がありません'}
+2. ${data.catchphrase_suggestions[1] || '案がありません'}
+3. ${data.catchphrase_suggestions[2] || '案がありません'}
+`;
+
+            // ペルソナデータがあれば追記
+            if (persona) {
+                const personaAttributes = persona.attributes.map(attr => 
+                    `  - ${attr.item}: ${attr.value}`
+                ).join('\n');
+
+                textContent += `
+========================================
+【採用ペルソナ設定】
+========================================
+
+◆ ペルソナ名: ${persona.persona_name}
+◆ ターゲット職種: ${persona.role}
+
+---
+【ペルソナの概要】
+${persona.summary}
+---
+
+【詳細属性】
+${personaAttributes}
+
+---
+【このペルソナに響く訴求点】
+${persona.recruitment_appeal_points}
+
+========================================
+`;
+            }
+
+            // Blobオブジェクトを作成し、ダウンロードリンクを生成
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const sanitizedShopName = shopName.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50); 
+            a.download = `口コミ分析結果_${sanitizedShopName}_${dateStr}.txt`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        /**
+         * 口コミ分析を実行する
+         */
+        async function analyzeReviews() {
+            let reviews = reviewInput.value.trim();
+            const shopName = shopNameInput.value.trim();
+            const analysisDepth = analysisDepthSelect.value; // NEW: 深度を取得
+
+            messageBox.style.display = 'none';
+            analysisResult.style.display = 'none';
+            analysisResult.innerHTML = '';
+            personaResult.style.display = 'none'; 
+            personaControls.classList.add('hidden'); 
+            downloadButtonTop.classList.add('hidden'); 
+            downloadBottomContainer.classList.add('hidden'); 
+            lastAnalysisData = null;
+            lastPersonaData = null; 
+            
+            // --- 店名自動検出ロジック --- 
+            if (!shopName && reviews.length > 0) {
+                const lines = reviews.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                if (lines.length > 0) {
+                    let firstLine = lines[0]; 
+                    let potentialShopName = firstLine; 
+                    let removedPrefix = false; 
+
+                    const prefix = "口コミ一覧 : ";
+                    if (potentialShopName.startsWith(prefix)) {
+                        potentialShopName = potentialShopName.substring(prefix.length).trim();
+                        removedPrefix = true;
+                    }
+                    
+                    if (potentialShopName.length > 0 && potentialShopName.length < 30 && !/[。？！\.!,\?]/g.test(potentialShopName)) {
+                        shopNameInput.value = potentialShopName;
+                        const originalReviewText = reviewInput.value.trim();
+                        
+                        const regex = new RegExp(firstLine.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'm'); 
+                        const updatedReviews = originalReviewText.replace(regex, '').trim();
+                        
+                        reviewInput.value = updatedReviews;
+                        reviews = updatedReviews;
+                        
+                        let message = '口コミテキストの最初の行を「お店の名前」として自動入力しました。';
+                        if (removedPrefix) {
+                            message += '内容を確認してください。';
+                        }
+                        displayMessage(message, 'info');
+                    }
+                }
+            }
+            // --- 店名自動検出ロジックここまで ---
+
+
+            if (reviews.length < 50) {
+                displayMessage('口コミ情報が短すぎます。複数の口コミをまとめて貼り付けてください。', 'error');
+                return;
+            }
+
+            // UIをローディング状態にする
+            analyzeButton.disabled = true;
+            analyzeButton.textContent = '分析中...';
+            loadingIndicator.style.display = 'flex';
+            
+            // 抽出したいJSONスキーマの定義
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    job_ad_analysis: {
+                        type: "OBJECT",
+                        description: "求人広告作成のための店舗分析結果",
+                        properties: {
+                            overall_rating: { "type": "STRING", "description": "複数の口コミから総合的に判断した5点満点での評価（例: 4.2/5点）" },
+                            recruitment_pitch: { "type": "STRING", "description": "求職者に響くように、お店の魅力を総合的にまとめた紹介文（200字程度）。" },
+                            catchphrase_suggestions: { 
+                                "type": "ARRAY", 
+                                "description": "お店の魅力を端的に表すキャッチコピー案（3案）",
+                                "items": { "type": "STRING" }
+                            },
+                            menu_highlights: { "type": "STRING", "description": "料理や商品の最も高く評価されている点、お店の「売り」の要約（日本語）" },
+                            atmosphere_and_service: { "type": "STRING", "description": "店内の雰囲気や接客について、ポジティブな側面を要約（日本語）" },
+                            customer_segment: { "type": "STRING", "description": "主な客層（例: 20代〜30代の女性、ビジネス層、家族連れなど）" },
+                            challenge_points: { "type": "STRING", "description": "改善点やネガティブな意見の要約（日本語）" },
+                            access_information: { "type": "STRING", "description": "最寄り駅からのアクセス難易度、立地（路地裏、大通り沿いなど）、求職者が通勤や訪問を想像しやすい具体的なアクセス情報を要約する（日本語）。" },
+                            special_services: { "type": "STRING", "description": "ユーザーが直接お店から受けた「良かったサービス」や「驚いたサービス」など、標準的ではない、特筆すべきサービスに関する口コミ内容を抽出し、要約する（日本語）。" },
+                            keywords: {
+                                "type": "ARRAY",
+                                "description": "口コミで頻繁に言及された、お店の特徴を表す重要なキーワード（日本語で5つ以内）",
+                                "items": { "type": "STRING" }
+                            },
+                            working_benefits: {
+                                "type": "OBJECT",
+                                "description": "口コミに基づいた、職種別の働くメリットと身につくスキル",
+                                "properties": {
+                                    "full_time_benefits": { "type": "STRING", "description": "正社員として働くメリット（日本語、キャリア形成、経営知識など）" },
+                                    "part_time_benefits": { "type": "STRING", "description": "アルバイトとして働くメリット（日本語、柔軟性、同僚の雰囲気など）" },
+                                    "hall_staff_skills": { "type": "STRING", "description": "ホールスタッフとして身につくスキル・メリット（日本語、接客力、コミュニケーション能力など）" },
+                                    "kitchen_staff_skills": { "type": "STRING", "description": "調理スタッフとして身につくスキル・メリット（日本語、専門技術、食材の知識など）" }
+                                },
+                                "propertyOrdering": ["full_time_benefits", "part_time_benefits", "hall_staff_skills", "kitchen_staff_skills"]
+                            }
+                        },
+                        propertyOrdering: ["overall_rating", "menu_highlights", "atmosphere_and_service", "customer_segment", "challenge_points", "access_information", "special_services", "keywords", "working_benefits", "recruitment_pitch", "catchphrase_suggestions"]
+                    }
+                }
+            };
+            
+            // NEW: 分析深度に基づく指示の調整
+            let depthInstruction = "";
+            switch (analysisDepth) {
+                case 'detailed':
+                    depthInstruction = "分析の深さ: 詳細。各項目について、標準の約2倍の文字量（400字程度）で、より具体的な事例や理由を掘り下げて記述してください。";
+                    break;
+                case 'in-depth':
+                    depthInstruction = "分析の深さ: 深掘り。各項目について、標準の約3倍の文字量（600字程度）で、専門家の視点から潜在的な求職者への影響、競合優位性、口コミの裏側にある意味合いまで深く考察して記述してください。";
+                    break;
+                case 'standard':
+                default:
+                    depthInstruction = "分析の深さ: 標準。各項目は簡潔に要点をまとめて記述してください。";
+                    break;
+            }
+
+            // システムインストラクション (更新)
+            const systemPrompt = `あなたはプロの求人広告ライター兼口コミ分析の専門家です。ユーザーから提供された複数の口コミテキストを分析し、特に求人広告の原稿に利用しやすいように、店舗の魅力を最大限に引き出す構造化された要約をJSON形式で、日本語のみで出力してください。JSONの前後に会話文を入れないでください。各フィールドは日本語で記述し、特に紹介文フィールドは200字程度で自然な文章でまとめてください。
+
+            【分析深度に関する重要指示】
+            ${depthInstruction}
+
+            また、働くメリットの項目では、口コミで示唆される内容に基づいて、各職種・雇用形態で得られる具体的なスキルやメリットを分析し、具体的に記述してください。`;
+
+            // ユーザーへのクエリ
+            const userQuery = `以下の飲食店の口コミを分析し、要求された形式で情報を抽出してください。
+            ---
+            口コミテキスト：
+            ${reviews}
+            ---`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                },
+            };
+
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                const candidate = result.candidates?.[0];
+                if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                    throw new Error("AIからの応答が不正です。");
+                }
+                
+                const jsonText = candidate.content.parts[0].text;
+                const analysisData = JSON.parse(jsonText).job_ad_analysis;
+                lastAnalysisData = analysisData; // 分析結果を保持
+
+                // 結果を整形してHTMLに挿入
+                const resultHtml = `
+                    <div class="space-y-6">
+                        <div class="p-3 bg-blue-100 rounded-lg flex justify-between items-center">
+                            <span class="text-xl font-bold text-blue-800">総合評価</span>
+                            <span class="text-2xl font-extrabold text-blue-600">${analysisData.overall_rating}</span>
+                        </div>
+                        
+                        
+                        <!-- 既存の詳細分類項目 -->
+                        <h2 class="text-2xl font-semibold text-gray-800 pt-4 border-t mt-6">詳細分類（原稿作成の基礎情報）</h2>
+
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">① 料理・商品の最大の魅力（原稿の核となる部分）</h3>
+                            <p class="p-3 bg-green-50 border-l-4 border-green-500 rounded-md whitespace-pre-wrap">${analysisData.menu_highlights}</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">② 雰囲気・接客の特徴（職場のイメージ）</h3>
+                            <p class="p-3 bg-purple-50 border-l-4 border-purple-500 rounded-md whitespace-pre-wrap">${analysisData.atmosphere_and_service}</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">③ 主な客層（働く上で重要な情報）</h3>
+                            <p class="p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded-md whitespace-pre-wrap">${analysisData.customer_segment}</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">④ 改善点・課題（正直に伝えるべき情報）</h3>
+                            <p class="p-3 bg-red-50 border-l-4 border-red-500 rounded-md whitespace-pre-wrap">${analysisData.challenge_points}</p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">⑤ アクセス情報（通勤・訪問のしやすさ）</h3>
+                            <p class="p-3 bg-blue-50 border-l-4 border-blue-500 rounded-md whitespace-pre-wrap">${analysisData.access_information}</p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">⑥ 特筆すべきサービス・顧客体験</h3>
+                            <p class="p-3 bg-pink-50 border-l-4 border-pink-500 rounded-md whitespace-pre-wrap">${analysisData.special_services}</p>
+                        </div>
+
+
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">頻出キーワード</h3>
+                            <!-- タグ表示のスタイルを更新しました -->
+                            <div class="flex flex-wrap gap-2">
+                                ${analysisData.keywords.map(kw => `<span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full shadow-sm">${kw}</span>`).join('')}
+                            </div>
+                        </div>
+
+
+                        <!-- 働くメリット・身につくスキル -->
+                        <h2 class="text-2xl font-semibold text-gray-800 pt-4 border-t mt-6">★ 働くメリット・身につくスキル (求職者向け)</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="benefit-card border-l-4 border-sky-500">
+                                <h4 class="font-bold text-lg text-sky-700 mb-1">正社員向けメリット</h4>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${analysisData.working_benefits.full_time_benefits}</p>
+                            </div>
+                            <div class="benefit-card border-l-4 border-pink-500">
+                                <h4 class="font-bold text-lg text-pink-700 mb-1">アルバイト向けメリット</h4>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${analysisData.working_benefits.part_time_benefits}</p>
+                            </div>
+                            <div class="benefit-card border-l-4 border-orange-500">
+                                <h4 class="font-bold text-lg text-orange-700 mb-1">ホールスタッフ向けスキル</h4>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${analysisData.working_benefits.hall_staff_skills}</p>
+                            </div>
+                            <div class="benefit-card border-l-4 border-lime-500">
+                                <h4 class="font-bold text-lg text-lime-700 mb-1">調理スタッフ向けスキル</h4>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${analysisData.working_benefits.kitchen_staff_skills}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 総合紹介文 -->
+                        <div class="bg-indigo-50 p-4 rounded-lg shadow-md border-2 border-indigo-300 pt-4 border-t mt-6">
+                            <h3 class="text-2xl font-bold text-indigo-700 mb-3">★ 求人原稿用：お店の総合紹介文</h3>
+                            <p class="text-gray-800 whitespace-pre-wrap">${analysisData.recruitment_pitch}</p>
+                        </div>
+                        
+                        <!-- キャッチコピー案 -->
+                        <div class="bg-yellow-50 p-4 rounded-lg shadow-md border-2 border-yellow-300">
+                            <h3 class="text-2xl font-bold text-yellow-700 mb-3">★ キャッチコピー案（3案）</h3>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-800">
+                                ${analysisData.catchphrase_suggestions.map(cp => `<li><strong class="text-lg">${cp}</strong></li>`).join('')}
+                            </ul>
+                        </div>
+                        
+                    </div>
+                `;
+                
+                analysisResult.innerHTML = resultHtml;
+                analysisResult.style.display = 'block';
+                downloadButtonTop.classList.remove('hidden'); 
+                downloadBottomContainer.classList.remove('hidden'); 
+                
+                // ペルソナコントロールを表示し、初期値を設定
+                personaControls.classList.remove('hidden'); 
+                targetRoleInput.value = 'アルバイト・ホールスタッフ'; 
+
+                // 分析完了後、チャット履歴をリセットし、AIに最初のメッセージを送る
+                resetChatAndInitialize(shopName);
+
+            } catch (error) {
+                console.error("API実行中にエラーが発生しました:", error);
+                displayMessage(`口コミの分析中にエラーが発生しました。入力内容を確認するか、再度お試しください。エラー: ${error.message}`, 'error');
+            } finally {
+                // UIをリセット
+                analyzeButton.disabled = false;
+                analyzeButton.textContent = '口コミを分析する';
+                loadingIndicator.style.display = 'none';
+            }
+        }
+        
+        /**
+         * ペルソナ生成を実行する
+         */
+        async function generatePersona() {
+            if (!lastAnalysisData) {
+                displayMessage('先に口コミ分析を完了させてください。', 'error');
+                return;
+            }
+
+            const targetRole = targetRoleInput.value.trim();
+            if (!targetRole) {
+                displayMessage('ターゲット職種/雇用形態を入力してください。', 'error');
+                return;
+            }
+
+            // UIをローディング状態にする
+            personaButton.disabled = true;
+            personaButton.textContent = 'ペルソナ生成中...';
+            personaResult.style.display = 'none';
+            personaResult.innerHTML = '';
+            messageBox.style.display = 'none';
+            lastPersonaData = null; 
+
+            // ペルソナのロジックは分析結果に依存するため、分析結果をJSON文字列としてプロンプトに含める
+            const analysisContext = JSON.stringify(lastAnalysisData, null, 2);
+
+            // 抽出したいJSONスキーマの定義 
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    persona_name: { "type": "STRING", "description": "設定したペルソナのフルネーム（架空）" },
+                    role: { "type": "STRING", "description": "採用ターゲットとする職種・雇用形態" },
+                    summary: { "type": "STRING", "description": "ペルソナの簡単な紹介文（3行程度）" },
+                    attributes: {
+                        "type": "ARRAY",
+                        "description": "ペルソナの詳細な属性リスト",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "item": { "type": "STRING", "description": "属性の項目名（例: 年齢、動機、性格、保有スキル、お店との適合性）" },
+                                "value": { "type": "STRING", "description": "属性の具体的な内容" }
+                            },
+                            "propertyOrdering": ["item", "value"]
+                        }
+                    },
+                    recruitment_appeal_points: {
+                        "type": "STRING",
+                        "description": "このペルソナに響くよう、特に強調すべき求人原稿の訴求点（3つ以内を箇条書きで）"
+                    }
+                },
+                propertyOrdering: ["persona_name", "role", "summary", "attributes", "recruitment_appeal_points"]
+            };
+
+            const systemPrompt = "あなたは採用戦略の専門家です。提供された口コミ分析結果を参照し、そのお店の魅力（強み）を最大限に活かせ、かつお店の課題を解決できるような『理想の採用ターゲット』のペルソナ（架空の人物像）を、指定された職種に合わせて、日本語のJSON形式で詳細に設定してください。JSONの前後に会話文を入れないでください。";
+            
+            // ターゲット職種をクエリに含める
+            const userQuery = `以下の分析結果を参考に、このお店が採用すべき理想的なペルソナを一人設定してください。
+
+            【ターゲット職種/雇用形態】: ${targetRole}
+
+            【口コミ分析結果】
+            ${analysisContext}
+            `;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                },
+            };
+            
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                const candidate = result.candidates?.[0];
+                if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                    throw new Error("AIからの応答が不正です。");
+                }
+                
+                const jsonText = candidate.content.parts[0].text;
+                const personaData = JSON.parse(jsonText);
+                lastPersonaData = personaData; // ペルソナ結果を保持
+
+                // ペルソナ結果を整形してHTMLに挿入
+                const attributesHtml = personaData.attributes.map(attr => `
+                    <div class="flex border-t border-gray-100 py-2">
+                        <div class="w-1/3 font-semibold text-gray-600">${attr.item}</div>
+                        <div class="w-2/3 text-gray-800 whitespace-pre-wrap">${attr.value}</div>
+                    </div>
+                `).join('');
+
+                const personaHtml = `
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-pink-200">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h2 class="text-2xl font-bold text-pink-700">★ 採用ペルソナ：${personaData.persona_name}</h2>
+                            <span class="text-sm font-medium text-gray-500">${personaData.role}</span>
+                        </div>
+                        
+                        <div class="mb-6 p-4 bg-pink-50 rounded-lg border border-pink-300">
+                            <h3 class="text-xl font-semibold text-pink-600 mb-2">ペルソナ概要</h3>
+                            <p class="text-gray-700 whitespace-pre-wrap">${personaData.summary}</p>
+                        </div>
+
+                        <h3 class="text-xl font-semibold text-gray-700 mb-2">詳細属性</h3>
+                        <div class="divide-y divide-gray-200">
+                            ${attributesHtml}
+                        </div>
+                        
+                        <div class="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                            <h3 class="text-xl font-semibold text-yellow-700 mb-2">このペルソナに響く求人原稿の訴求点</h3>
+                            <p class="text-gray-800 whitespace-pre-wrap">${personaData.recruitment_appeal_points}</p>
+                        </div>
+                    </div>
+                `;
+
+                personaResult.innerHTML = personaHtml;
+                personaResult.style.display = 'block';
+                downloadButtonTop.classList.remove('hidden'); 
+                downloadBottomContainer.classList.remove('hidden'); 
+
+            } catch (error) {
+                console.error("ペルソナ生成中にエラーが発生しました:", error);
+                displayMessage(`ペルソナの生成中にエラーが発生しました。再度お試しください。エラー: ${error.message}`, 'error');
+            } finally {
+                // UIをリセット
+                personaButton.disabled = false;
+                personaButton.textContent = '採用ペルソナを設定/再設定する';
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        /**
+         * チャット履歴をリセットし、AIからの最初のメッセージを表示する
+         * @param {string} shopName - お店の名前
+         */
+        function resetChatAndInitialize(shopName) {
+            chatHistory = [];
+            chatHistoryArea.innerHTML = '';
+            
+            const initialMessage = `${shopName}の口コミ分析が完了しました。
+
+この結果（総合評価、紹介文、キャッチコピー、働くメリットなど）を基に、より求職者に響くように文章のリライトやアイデア出しのサポートが可能です。
+
+例：「紹介文を、女性が働きやすい点を強調してリライトして」「キャッチコピーをあと2案出して」など、具体的にお聞かせください。`;
+
+            appendMessage('ai', initialMessage);
+        }
+
+        /**
+         * メッセージをチャット履歴に追加する
+         * @param {string} sender - 'user' or 'ai'
+         * @param {string} text - メッセージテキスト
+         */
+        function appendMessage(sender, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            
+            // Markdownの箇条書きを改行に変換して表示を改善
+            const formattedText = text.replace(/^- /gm, '• ').replace(/\n/g, '<br>');
+
+            messageDiv.innerHTML = formattedText;
+            chatHistoryArea.appendChild(messageDiv);
+            chatHistoryArea.scrollTop = chatHistoryArea.scrollHeight; // スクロールを一番下へ
+        }
+        
+        /**
+         * AIとの会話を処理する
+         */
+        async function sendMessage() {
+            const userMessage = chatInput.value.trim();
+            if (!userMessage) return;
+
+            if (!lastAnalysisData) {
+                appendMessage('ai', '申し訳ありませんが、会話を開始するには先に口コミの分析を完了させてください。');
+                return;
+            }
+
+            // ユーザーメッセージを表示し、履歴に追加
+            appendMessage('user', userMessage);
+            chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
+            chatInput.value = '';
+
+            // AIの応答待ちローディングを表示
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message ai-message';
+            loadingDiv.innerHTML = '<div class="chat-loading"></div>';
+            chatHistoryArea.appendChild(loadingDiv);
+            chatHistoryArea.scrollTop = chatHistoryArea.scrollHeight;
+
+            chatInput.disabled = true;
+            chatSendButton.disabled = true;
+
+            try {
+                // AIに渡すためのシステムインストラクションを構築
+                const analysisContext = JSON.stringify(lastAnalysisData, null, 2);
+                const shopName = shopNameInput.value.trim() || 'このお店';
+                
+                let personaContext = "";
+                if (lastPersonaData) {
+                    personaContext = JSON.stringify(lastPersonaData, null, 2);
+                }
+
+                const systemPrompt = `あなたはプロの求人広告ライターをサポートするAIアシスタントです。ユーザーは、現在表示されている口コミ分析結果（${shopName}のデータ）を基に、求人広告の原稿を改善したいと考えています。${personaContext ? 'また、生成済みの採用ペルソナも参照可能です。' : ''}
+                
+                あなたの役割は、ユーザーからのリライトやアイデア出しの要求に対して、具体的かつ役立つ返答をすることです。
+
+                特に、リライト要求があった場合は、必ず新しい文章を提案してください。アイデア出しの要求には、新しい視点を提供してください。
+
+                【現在の分析結果データ（JSON参照用）】
+                ${analysisContext}
+                
+                ${personaContext ? `【現在の採用ペルソナデータ（JSON参照用）】\n${personaContext}` : ''}
+                
+                この分析データを参照し、会話の流れを考慮して、自然な日本語で応答してください。`;
+
+                
+                const payload = {
+                    // 履歴と最新のメッセージをコンテンツとして渡す
+                    contents: chatHistory,
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                const aiResponseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "応答エラーが発生しました。再度お試しください。";
+
+                // ローディングを削除し、AIメッセージを表示
+                chatHistoryArea.removeChild(loadingDiv);
+                appendMessage('ai', aiResponseText);
+                
+                // 履歴を更新
+                chatHistory.push({ role: "model", parts: [{ text: aiResponseText }] });
+
+            } catch (error) {
+                console.error("Chat API実行中にエラーが発生しました:", error);
+                chatHistoryArea.removeChild(loadingDiv);
+                appendMessage('ai', 'AIとの通信中にエラーが発生しました。ネットワークを確認して再度お試しください。');
+            } finally {
+                chatInput.disabled = false;
+                chatSendButton.disabled = false;
+                chatInput.focus();
+            }
+        }
+        
+    </script>
+</body>
+</html>

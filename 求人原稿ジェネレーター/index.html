@@ -1,0 +1,1172 @@
+<!https://gemini.google.com/share/d896462cd8c0>
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飲食店求人原稿（魅力特化・装飾カスタム版）ジェネレーター</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Sans+JP:wght@100..900&display=swap');
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            background-color: #f7ffef;
+        }
+        .container-main {
+            max-width: 1200px;
+        }
+        .input-card {
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .gradient-button {
+            background-image: linear-gradient(to right, #10b981 0%, #059669 100%);
+            transition: all 0.3s ease;
+        }
+        .gradient-button:hover {
+            background-image: linear-gradient(to left, #047857 0%, #065f46 100%);
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.5), 0 4px 6px -2px rgba(16, 185, 129, 0.05);
+        }
+        .refine-button {
+            background-color: #3b82f6; /* Blue */
+        }
+        .refine-button:hover {
+            background-color: #2563eb;
+        }
+        .reset-button {
+            background-color: #ef4444; /* Red */
+        }
+        .reset-button:hover {
+            background-color: #dc2626;
+        }
+        /* New Button for Short Copy Generation */
+        .short-copy-button {
+            background-color: #f59e0b; /* Amber */
+        }
+        .short-copy-button:hover {
+            background-color: #d97706;
+        }
+        /* Range Slider Custom Styling */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px; 
+            height: 16px;
+            background: #059669; 
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+        /* カスタムスタイル: 入力項目の見出しの視認性向上 */
+        .generator-label {
+            display: block;
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 500; /* font-medium */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 0.25rem; /* mb-1 */
+            padding: 0.5rem; /* p-2 */
+            background-color: #f0fdf4; /* bg-green-50 */
+            border-radius: 0.5rem; /* rounded-lg */
+            border: 1px solid #dcfce7; /* border-green-100 */
+        }
+        /* Current Draft Editable Area */
+        #current-draft-display[contenteditable="true"] {
+            border: 1px solid #e5e7eb;
+            transition: border-color 0.2s;
+        }
+        #current-draft-display[contenteditable="true"]:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+    </style>
+    <!-- Firebase Imports for Mandatory Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firestoreログレベルをデバッグに設定
+        setLogLevel('Debug');
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let userId;
+
+        window.onload = async () => {
+            if (firebaseConfig) {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                window.db = db;
+                window.auth = auth;
+                
+                try {
+                    if (initialAuthToken) {
+                        const userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                        userId = userCredential.user.uid;
+                    } else {
+                        const userCredential = await signInAnonymously(auth);
+                        userId = userCredential.user.uid;
+                    }
+                    console.log("Firebase Auth successful. User ID:", userId);
+                    window.userId = userId;
+                } catch (error) {
+                    console.error("Firebase Auth failed:", error);
+                }
+            } else {
+                console.warn("Firebase configuration not found. Running without persistence.");
+                window.userId = crypto.randomUUID(); // Fallback
+            }
+        };
+    </script>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container-main mx-auto">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 border-b-4 border-emerald-500 pb-2">
+            飲食店求人原稿（魅力特化・装飾カスタム版）ジェネレーター
+        </h1>
+        <p class="mb-8 text-gray-600">
+            採用ターゲットとトーンを設定し、お店の事実情報と、参考にしたい原稿の文体を貼り付けて、魅力的な本文を生成します。
+        </p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 入力パネル (左側) -->
+            <div class="space-y-6">
+                <div class="input-card p-6 rounded-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <svg class="w-6 h-6 text-emerald-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            生成条件の設定
+                        </h2>
+                        <!-- 全入力をリセットボタン -->
+                        <button id="reset-button" onclick="resetAllInputs()" class="reset-button text-white font-bold py-1.5 px-4 rounded-full text-sm shadow-md hover:shadow-lg transition duration-200 flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2A9 9 0 111 12a9 9 0 0118 0z"></path></svg>
+                            全入力をリセット
+                        </button>
+                    </div>
+                    
+                    <!-- 1. 募集職種 (プルダウン) -->
+                    <div>
+                        <label for="job-title-select" class="generator-label">
+                            1. 募集職種 <span class="text-xs text-gray-500 font-normal">(規定の職種一覧から選択)</span>
+                        </label>
+                        <select id="job-title-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3">
+                            <option value="店長候補・マネージャー" selected>店長候補・マネージャー</option>
+                            <option value="サービス・ホール">サービス・ホール</option>
+                            <option value="料理長候補（シェフ・板前など）">料理長候補（シェフ・板前など）</option>
+                            <option value="調理スタッフ">調理スタッフ</option>
+                            <option value="調理補助・調理見習い">調理補助・調理見習い</option>
+                            <option value="パティシエ">パティシエ</option>
+                            <option value="パン職人・ブーランジェ">パン職人・ブーランジェ</option>
+                            <option value="ピザ職人・ピッツァイオーロ">ピザ職人・ピッツァイオーロ</option>
+                            <option value="ソムリエ">ソムリエ</option>
+                            <option value="バーテンダー">バーテンダー</option>
+                            <option value="バリスタ">バリスタ</option>
+                            <option value="レセプション・フロント">レセプション・フロント</option>
+                            <option value="洗い場・皿洗い">洗い場・皿洗い</option>
+                            <option value="販売スタッフ">販売スタッフ</option>
+                            <option value="本部スタッフ・SV">本部スタッフ・SV</option>
+                            <option value="デリバリー・配達スタッフ">デリバリー・配達スタッフ</option>
+                            <option value="食品加工・製造（精肉・鮮魚等）">食品加工・製造（精肉・鮮魚等）</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. 採用ターゲット (datalist - valueを空欄に修正) -->
+                    <div class="mt-4">
+                        <label for="target-input" class="generator-label">
+                            2. 採用ターゲット <span class="text-xs text-gray-500 font-normal">(選択肢または任意入力)</span>
+                        </label>
+                        <input type="text" id="target-input" list="target-options" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3" value="" placeholder="例: 未経験の学生、独立志向の若手など">
+                        <datalist id="target-options">
+                            <option value="未経験・バイトデビューの学生">
+                            <option value="家庭と両立したい主婦・主夫（扶養内希望）">
+                            <option value="副業・Wワークで稼ぎたい社会人">
+                            <option value="将来、独立・開業を目指す若手（正社員候補）">
+                            <option value="経験を活かしたいミドル・シニア層">
+                            <option value="フルタイムでしっかり働きたいフリーター">
+                        </datalist>
+                    </div>
+                    
+                    <!-- 3. 募集背景・成長フェーズ (datalist - valueを空欄に修正) -->
+                    <div class="mt-4">
+                        <label for="recruitment-phase-input" class="generator-label">
+                            3. 募集背景・成長フェーズ <span class="text-xs text-gray-500 font-normal">(選択肢または任意入力)</span>
+                        </label>
+                        <input type="text" id="recruitment-phase-input" list="recruitment-phase-options" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3" value="" placeholder="例: 新規オープン、組織体制強化による増員など">
+                        <datalist id="recruitment-phase-options">
+                            <option value="新規出店・事業拡大に伴う立ち上げメンバー募集">
+                            <option value="店舗リニューアル・業態変更に伴う再スタート">
+                            <option value="組織体制強化・次世代育成のための増員">
+                            <option value="業務量増加・売上好調による人員強化">
+                            <option value="既存スタッフの退職に伴う欠員補充">
+                            <option value="季節限定・期間限定の短期募集">
+                        </datalist>
+                    </div>
+
+                    <!-- 4. トーン＆マナー (datalist - valueを空欄に修正) -->
+                    <div class="mt-4">
+                        <label for="tone-input" class="generator-label">
+                            4. 文章のトーン＆マナー <span class="text-xs text-gray-500 font-normal">(選択肢または任意入力)</span>
+                        </label>
+                        <input type="text" id="tone-input" list="tone-options" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3" value="" placeholder="例: プロフェッショナルなトーン、アットホームな雰囲気など">
+                        <datalist id="tone-options">
+                            <option value="親しみやすく、フレンドリーでアットホームな雰囲気">
+                            <option value="目標志向で、キャリアアップを強調するプロフェッショナルなトーン">
+                            <option value="落ち着いた、高級店にふさわしい上質なトーン">
+                            <option value="活気、情熱、エネルギッシュさを前面に出す若者向けトーン">
+                            <option value="真面目さ、誠実さ、安定感を重視したビジネスライクなトーン">
+                            <option value="情報量が多く、詳細を丁寧に伝える説明的なトーン">
+                        </datalist>
+                    </div>
+                    
+                    <!-- 5. 絵文字の利用度 -->
+                    <div class="mt-4">
+                        <label for="emoji-level-input" class="generator-label">
+                            5. 絵文字（環境依存文字）の利用度
+                            <span class="text-xs text-gray-500 font-normal">（本文に付与する量を調整します）</span>
+                        </label>
+                        <input type="range" id="emoji-level-input" min="1" max="4" value="2" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-xs text-gray-600 mt-1 px-1">
+                            <span class="font-semibold">控えめ (1)</span>
+                            <span class="font-semibold">標準 (2)</span>
+                            <span class="font-semibold">多め (3)</span>
+                            <span class="font-semibold">非常に多め (4)</span>
+                        </div>
+                    </div>
+
+                    <!-- 6. 本文の区切り線・罫線のスタイル -->
+                    <div class="mt-4">
+                        <label for="divider-style-select" class="generator-label">
+                            6. 本文の区切り線・罫線のスタイル
+                        </label>
+                        <select id="divider-style-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3">
+                            <option value="default">----------</option>
+                            <option value="star-diamond">✦*---*✦</option>
+                            <option value="wave-dot">〜〜・〜〜</option>
+                            <option value="unicode-fancy">⊹✦･.━━━━━━━</option>
+                            <option value="diamond-line">---◇---◇---</option>
+                            <option value="star-block">＊＊＊＊＊</option>
+                            <option value="colon-dot">---:::---:::---</option>
+                            <option value="reference-block">※※※※※※</option>
+                            <option value="wave-full">〰️〰️〰️〰️〰️</option>
+                            <option value="arrow-line">---▶︎---▶︎---</option>
+                            <option value="none">使用しない</option>
+                        </select>
+                    </div>
+
+                    <!-- 7. 箇条書き・強調シンボルの種類 -->
+                    <div class="mt-4">
+                        <label for="symbol-style-select" class="generator-label">
+                            7. 箇条書き・強調シンボルの種類
+                        </label>
+                        <select id="symbol-style-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3">
+                            <option value="checkmark-emoji">✅</option>
+                            <option value="star-symbol">★</option>
+                            <option value="flower-emoji">🌸</option>
+                            <option value="hand-point">👉</option>
+                            <option value="double-circle">◎</option>
+                            <option value="music-note">♪</option>
+                            <option value="lightbulb">💡</option>
+                            <option value="thumbs-up">👍</option>
+                            <option value="heart">💖</option>
+                            <option value="fire">🔥</option>
+                            <option value="sparkle">✨</option>
+                            <option value="dash">－</option>
+                        </select>
+                    </div>
+
+                    <!-- 8. お店の特徴・魅力 (事実ベース) -->
+                    <div class="mt-8">
+                        <label for="store-features-text" class="block text-base font-bold text-white mb-2 p-3 bg-emerald-600 rounded-lg shadow-md">
+                            8. 必須情報：お店の特徴・魅力 (事実ベース)
+                            <span class="text-xs text-emerald-200 block font-normal">(HPのコンセプト、料理のこだわり、職場の雰囲気など、お店の事実情報を箇条書きで貼り付けてください)</span>
+                        </label>
+                        <textarea id="store-features-text" rows="6" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3" placeholder="例：
+・コンセプトは「地中海沿岸の伝統料理」。
+・キッチンはオープンカウンターで、お客様との会話も多い。
+・社員の平均年齢は28歳。"></textarea>
+                    </div>
+                    
+                    <!-- 9. 参考にしたい原稿の本文 (トーン継承用) - ピン留めがあればそれを優先 -->
+                    <div class="mt-4">
+                        <label for="template-copy-text" class="block text-base font-bold text-gray-800 mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg shadow-sm">
+                            9. 参考にしたい原稿の本文（トーン継承用）
+                            <span id="pin-status" class="text-xs text-red-500 block font-normal">
+                                （ピン留めされた文章案は、ここで指定された文章より優先されます。）
+                            </span>
+                        </label>
+                        <textarea id="template-copy-text" rows="6" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3" placeholder="例：
+（他社の求人原稿や、自社のWebサイトの文章など、生成したい文章に近いトーンのものを貼り付けてください。未入力の場合は、項目4のトーン設定に従います。）"></textarea>
+                    </div>
+                    
+                    <!-- 生成ボタン -->
+                    <button id="generate-button" onclick="generateCopy(false)" class="gradient-button text-white font-bold py-3 px-6 rounded-full w-full mt-6 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50" disabled>
+                        <span id="button-text">求人原稿を生成する（初期生成）</span>
+                        <svg id="loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                    <div id="error-message" class="text-red-600 mt-3 text-sm hidden"></div>
+                </div>
+
+                <!-- 3. 短文コピー生成エリア (新設) -->
+                <div class="input-card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-6 h-6 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        キャッチコピー・業態名 生成ツール
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4">
+                        現在のドラフトの内容を要約し、訴求力の高いキャッチコピー（50文字以内）と業態の詳細名（25文字以内）をそれぞれ5案提案します。
+                    </p>
+                    
+                    <button id="generate-short-copy-button" onclick="generateShortCopy()" class="short-copy-button text-white font-bold py-2 px-4 rounded-lg w-full shadow-md hover:shadow-lg transition duration-200 disabled:opacity-50 flex items-center justify-center" disabled>
+                        <span id="short-copy-button-text">キャッチコピー・業態名を生成する</span>
+                        <svg id="short-copy-loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                    <div id="short-copy-error-message" class="text-red-600 mt-2 text-sm hidden"></div>
+
+                    <!-- 短文コピー出力エリア -->
+                    <div id="short-copy-output-panel" class="mt-4 p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4 hidden">
+                        <!-- 結果はJavaScriptでここに挿入されます -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 出力・リライト・履歴パネル (右側) -->
+            <div class="space-y-6">
+                <!-- 1. 現在のドラフト -->
+                <div class="input-card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-6 h-6 text-emerald-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        現在のドラフト（手動編集も可能）
+                    </h2>
+                    
+                    <div id="current-draft-display" contenteditable="true" class="bg-gray-50 border border-gray-200 rounded-lg p-4 min-h-[300px] whitespace-pre-wrap text-gray-800 leading-relaxed text-sm focus:bg-white">
+                        <!-- ここに生成された本文が表示されます -->
+                        <p class="text-gray-400">求人原稿を生成すると、ここに最新のドラフトが表示されます。</p>
+                    </div>
+
+                    <div class="flex justify-between mt-4">
+                        <button id="copy-button" onclick="copyToClipboard()" class="text-gray-500 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-100 transition duration-150 flex items-center" disabled>
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v4a1 1 0 001 1h4a1 1 0 001-1V7m0 0a2 2 0 002-2a2 2 0 00-2-2m0 0H8m8 0a2 2 0 012 2v10a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2h8z"></path></svg>
+                            クリップボードにコピー
+                        </button>
+                        <button id="pin-current-button" onclick="pinDraft()" class="text-sm bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg px-4 py-2 hover:bg-yellow-200 transition duration-150 flex items-center" disabled>
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"></path></svg>
+                            この案をピン留めする
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. リライト・調整機能 -->
+                <div class="input-card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0 0a2 2 0 100 4a2 2 0 000-4zM10 14H7m4 0v4m0-4a2 2 0 100 4a2 2 0 000-4zM13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        リライト・表現調整ツール
+                    </h2>
+                    <textarea id="refine-input" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" placeholder="例：『熱い情熱』を『着実に成長』という表現に変えてください。また、冒頭にもっとターゲットへの呼びかけを追加してください。"></textarea>
+                    
+                    <button id="refine-button" onclick="refineCopy()" class="refine-button text-white font-bold py-2 px-4 rounded-lg w-full mt-3 shadow-md hover:shadow-lg transition duration-200 disabled:opacity-50 flex items-center justify-center" disabled>
+                        <span id="refine-button-text">現在のドラフトをリライトする</span>
+                        <svg id="refine-loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                    <div id="refine-error-message" class="text-red-600 mt-2 text-sm hidden"></div>
+                </div>
+
+                <!-- 3. バージョン履歴（最大5案） -->
+                <div class="input-card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-6 h-6 text-orange-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        履歴（最大5案）とピン留め
+                    </h2>
+                    <div id="history-list" class="space-y-4">
+                        <p class="text-gray-400 text-sm">生成またはリライトを行うと、ここに履歴が表示されます。</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 【修正点】APIキーはCanvas環境によって提供されることを前提として空欄のまま
+        const API_KEY = "";
+        const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
+        const MAX_HISTORY = 5;
+
+        // UI要素の参照 (既存)
+        const jobTitleSelect = document.getElementById('job-title-select'); 
+        const targetInput = document.getElementById('target-input');
+        const recruitmentPhaseInput = document.getElementById('recruitment-phase-input');
+        const toneInput = document.getElementById('tone-input');
+        const dividerStyleSelect = document.getElementById('divider-style-select');
+        const symbolStyleSelect = document.getElementById('symbol-style-select');
+        const emojiLevelInput = document.getElementById('emoji-level-input');
+        const storeFeaturesTextarea = document.getElementById('store-features-text');
+        const templateCopyTextarea = document.getElementById('template-copy-text');
+        const generateButton = document.getElementById('generate-button');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorMessage = document.getElementById('error-message');
+        const copyButton = document.getElementById('copy-button');
+        const pinStatus = document.getElementById('pin-status');
+
+        // UI要素の参照 (短文コピー関連 - 新設)
+        const generateShortCopyButton = document.getElementById('generate-short-copy-button');
+        const shortCopyButtonText = document.getElementById('short-copy-button-text');
+        const shortCopyLoadingSpinner = document.getElementById('short-copy-loading-spinner');
+        const shortCopyErrorMessage = document.getElementById('short-copy-error-message');
+        const shortCopyOutputPanel = document.getElementById('short-copy-output-panel');
+
+        // UI要素の参照 (リライト・履歴関連)
+        const currentDraftDisplay = document.getElementById('current-draft-display');
+        const refineInput = document.getElementById('refine-input');
+        const refineButton = document.getElementById('refine-button');
+        const refineButtonText = document.getElementById('refine-button-text');
+        const refineLoadingSpinner = document.getElementById('refine-loading-spinner');
+        const refineErrorMessage = document.getElementById('refine-error-message');
+        const historyList = document.getElementById('history-list');
+        const pinCurrentButton = document.getElementById('pin-current-button');
+
+        // 状態管理 (in-memory session state)
+        let copyHistory = []; // { text: "...", timestamp: "..." }
+        let pinnedDraft = null; // { text: "...", timestamp: "..." }
+        let currentDraftText = currentDraftDisplay.textContent.trim();
+        
+        // 初期値の保持 (リセット用)
+        const defaultValues = {
+            jobTitle: jobTitleSelect.value,
+            emojiLevel: emojiLevelInput.value,
+            dividerStyle: dividerStyleSelect.value,
+            symbolStyle: symbolStyleSelect.value,
+            currentDraftInitial: currentDraftDisplay.innerHTML
+        };
+
+
+        // --- UI & State Management Functions ---
+
+        /**
+         * お店の特徴、または現在のドラフトの有無に応じてボタンの有効・無効を切り替える
+         */
+        function checkInputAndToggleButtons() {
+            const hasStoreFeatures = storeFeaturesTextarea.value.trim().length > 0;
+            generateButton.disabled = !hasStoreFeatures;
+            
+            const draftContent = currentDraftDisplay.textContent.trim();
+            const initialPlaceholder = '求人原稿を生成すると、ここに最新のドラフトが表示されます。';
+            const hasDraft = draftContent !== '' && draftContent !== initialPlaceholder;
+            
+            // リライトボタンの制御
+            const hasRefineInstruction = refineInput.value.trim().length > 0;
+            refineButton.disabled = !(hasDraft && hasRefineInstruction);
+            
+            // 短文コピーボタンの制御 (ドラフトがあれば有効)
+            generateShortCopyButton.disabled = !hasDraft;
+
+            // コピーとピン留めボタンの制御
+            copyButton.disabled = !hasDraft;
+            pinCurrentButton.disabled = !hasDraft;
+            
+            currentDraftText = currentDraftDisplay.textContent.trim();
+        }
+
+        // イベントリスナーの追加
+        storeFeaturesTextarea.addEventListener('input', checkInputAndToggleButtons);
+        templateCopyTextarea.addEventListener('input', checkInputAndToggleButtons);
+        refineInput.addEventListener('input', checkInputAndToggleButtons);
+        currentDraftDisplay.addEventListener('input', checkInputAndToggleButtons); // 手動編集時にもチェック
+
+        // 初期状態のボタン有効化チェック
+        checkInputAndToggleButtons();
+
+        /**
+         * 全ての入力項目を初期値に戻し、履歴とドラフトをクリアする
+         */
+        window.resetAllInputs = function() {
+            // 1. 入力フィールドのリセット
+            jobTitleSelect.value = defaultValues.jobTitle;
+            targetInput.value = '';
+            recruitmentPhaseInput.value = '';
+            toneInput.value = '';
+            emojiLevelInput.value = defaultValues.emojiLevel;
+            dividerStyleSelect.value = defaultValues.dividerStyle;
+            symbolStyleSelect.value = defaultValues.symbolStyle;
+            storeFeaturesTextarea.value = '';
+            templateCopyTextarea.value = '';
+            refineInput.value = '';
+
+            // 2. ドラフト、履歴、ピン留めのリセット
+            currentDraftDisplay.innerHTML = defaultValues.currentDraftInitial;
+            copyHistory = [];
+            pinnedDraft = null;
+            renderHistory();
+            updatePinStatusUI();
+
+            // 3. 短文コピー出力のリセット
+            shortCopyOutputPanel.innerHTML = '';
+            shortCopyOutputPanel.classList.add('hidden');
+            
+            // 4. ボタンの有効/無効を更新
+            checkInputAndToggleButtons();
+            
+            // 5. メッセージ
+            alertMessage('すべての入力がリセットされました。', 'red');
+        }
+
+        /**
+         * 履歴リストのHTMLをレンダリングする
+         */
+        function renderHistory() {
+            if (copyHistory.length === 0) {
+                historyList.innerHTML = '<p class="text-gray-400 text-sm">生成またはリライトを行うと、ここに履歴が表示されます。</p>';
+                return;
+            }
+
+            historyList.innerHTML = copyHistory.map((draft, index) => {
+                const isPinned = pinnedDraft && pinnedDraft.timestamp === draft.timestamp;
+                const date = new Date(draft.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                
+                return `
+                    <div id="history-${draft.timestamp}" class="border border-gray-200 rounded-lg p-3 bg-white shadow-sm transition duration-150 ${isPinned ? 'border-yellow-500 ring-2 ring-yellow-200' : 'hover:bg-gray-50'}">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold ${isPinned ? 'text-yellow-800' : 'text-gray-700'}">
+                                ${isPinned ? '🌟 ピン留め中' : `履歴 #${copyHistory.length - index}`} (${date})
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-600 line-clamp-3 mb-2 whitespace-pre-wrap">${draft.text.substring(0, 150)}...</p>
+                        <div class="flex space-x-2 mt-2">
+                            <button onclick="rollback(${index})" class="text-xs bg-orange-500 text-white px-3 py-1 rounded-full hover:bg-orange-600 transition duration-150">
+                                ⏪ この案に戻す
+                            </button>
+                            <button onclick="pinDraft(${index})" class="text-xs ${isPinned ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-800'} px-3 py-1 rounded-full hover:bg-yellow-500 hover:text-white transition duration-150">
+                                ${isPinned ? 'ピン解除' : 'たたき台として使用（ピン留め）'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**
+         * 履歴にある文章を現在のドラフトに戻す（ロールバック）
+         */
+        window.rollback = function(index) {
+            const draft = copyHistory[index];
+            
+            // 1. 履歴のテキストで現在のドラフトを即座に上書き
+            currentDraftDisplay.textContent = draft.text;
+
+            // 2. 履歴にロールバックしたものは、ピン留め解除し、現在のドラフトとして扱う
+            pinnedDraft = null;
+            updatePinStatusUI();
+            
+            // 3. ボタンの状態を更新
+            checkInputAndToggleButtons();
+
+            // 4. 視覚的なフィードバック（フォーカス）
+            currentDraftDisplay.focus(); 
+            
+            // 5. 完了メッセージ
+            alertMessage('現在のドラフトにロールバックしました。', 'blue');
+            renderHistory(); // ピン留め状態が変わる可能性があるので再描画
+        }
+
+        /**
+         * 文章をピン留めまたはピン解除する
+         */
+        window.pinDraft = function(index) {
+            let draftToPin;
+            if (typeof index === 'number') {
+                draftToPin = copyHistory[index];
+            } else {
+                // 現在のドラフトをピン留めする場合
+                draftToPin = { text: currentDraftDisplay.textContent.trim(), timestamp: Date.now() };
+            }
+
+            if (pinnedDraft && pinnedDraft.timestamp === draftToPin.timestamp) {
+                // ピン解除
+                pinnedDraft = null;
+                alertMessage('ピン留めを解除しました。', 'red');
+            } else {
+                // 新しいピン留め
+                // ピン留め前のピンを解除
+                pinnedDraft = draftToPin;
+                
+                // 現在のドラフトではないものをピン留めした場合、履歴に存在しないと困るので、もし履歴にない場合は追加する
+                if (typeof index !== 'number' && !copyHistory.find(d => d.timestamp === draftToPin.timestamp)) {
+                    // 現在のドラフトを履歴の先頭に追加
+                    copyHistory.unshift(draftToPin);
+                    copyHistory.splice(MAX_HISTORY);
+                }
+                alertMessage('現在の案をたたき台としてピン留めしました！', 'yellow');
+            }
+
+            // 状態に基づいてUIを更新
+            updatePinStatusUI();
+            renderHistory();
+        }
+
+        /**
+         * ピン留め状態をUIに反映
+         */
+        function updatePinStatusUI() {
+            if (pinnedDraft) {
+                pinStatus.innerHTML = `
+                    <span class="text-base text-yellow-800 font-bold">🌟 ピン留め中の文章をベースに使用します。</span>
+                    <span class="text-xs text-red-500 block font-normal">（項目9の入力内容は無視されます）</span>
+                `;
+                pinCurrentButton.textContent = 'ピン解除';
+            } else {
+                pinStatus.innerHTML = `
+                    （ピン留めされた文章案は、ここで指定された文章より優先されます。）
+                `;
+                pinCurrentButton.textContent = 'この案をピン留めする';
+            }
+        }
+
+        /**
+         * 生成結果をドラフトに反映し、履歴を更新する
+         */
+        function updateDraftAndHistory(newText) {
+            const now = Date.now();
+            
+            // 1. 現在のドラフトを履歴に追加 (ピン留めされていても最新の履歴として記録)
+            const draftToHistory = { text: currentDraftDisplay.textContent.trim(), timestamp: now - 1 };
+            // 初期プレースホルダーでないことを確認
+            const initialPlaceholder = '求人原稿を生成すると、ここに最新のドラフトが表示されます。';
+            if (draftToHistory.text !== '' && draftToHistory.text !== initialPlaceholder) {
+                copyHistory.unshift(draftToHistory);
+                copyHistory.splice(MAX_HISTORY); // 最大履歴数を超えた分を削除
+            }
+
+            // 2. 新しいテキストをドラフトに表示
+            currentDraftDisplay.textContent = newText;
+            currentDraftText = newText;
+
+            // 3. 履歴UIを更新
+            renderHistory();
+        }
+
+
+        // --- Utility Functions ---
+
+        /**
+         * スピナーとテキストを制御するユーティリティ
+         */
+        function setUILoading(isLoading, type = 'generate') {
+            let button, textEl, spinner;
+            let defaultText;
+
+            if (type === 'generate') {
+                button = generateButton;
+                textEl = buttonText;
+                spinner = loadingSpinner;
+                defaultText = '求人原稿を生成する（初期生成）';
+            } else if (type === 'refine') {
+                button = refineButton;
+                textEl = refineButtonText;
+                spinner = refineLoadingSpinner;
+                defaultText = '現在のドラフトをリライトする';
+            } else if (type === 'short_copy') {
+                button = generateShortCopyButton;
+                textEl = shortCopyButtonText;
+                spinner = shortCopyLoadingSpinner;
+                defaultText = 'キャッチコピー・業態名を生成する';
+            }
+
+            button.disabled = isLoading;
+            textEl.textContent = isLoading ? (type === 'short_copy' ? '生成中...' : (type === 'refine' ? 'リライト中...' : '魅力的な原稿を生成しています...')) : defaultText;
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+            } else {
+                spinner.classList.add('hidden');
+            }
+            
+            // メイン/リライト実行中は他の機能もロック
+            if (type === 'generate' || type === 'refine') {
+                refineButton.disabled = isLoading;
+                generateButton.disabled = isLoading;
+                generateShortCopyButton.disabled = isLoading;
+                copyButton.disabled = isLoading;
+                pinCurrentButton.disabled = isLoading;
+            }
+            
+            // ロード解除時にボタンの状態を再チェック
+            if (!isLoading) {
+                checkInputAndToggleButtons();
+            }
+        }
+
+        /**
+         * アラートメッセージを表示する
+         */
+        function alertMessage(message, type) {
+            const el = document.createElement('div');
+            el.textContent = message;
+            el.className = `fixed top-4 right-4 p-3 rounded-lg shadow-xl text-white z-50 transition-opacity duration-300 ${type === 'red' ? 'bg-red-500' : type === 'blue' ? 'bg-blue-500' : type === 'yellow' ? 'bg-yellow-500' : type === 'amber' ? 'bg-amber-500' : 'bg-gray-700'}`;
+            document.body.appendChild(el);
+            setTimeout(() => {
+                el.classList.add('opacity-0');
+                el.addEventListener('transitionend', () => el.remove());
+            }, 3000);
+        }
+
+        // --- Core API Functions (Generics) ---
+
+        /**
+         * API呼び出しのロジック（リトライ処理付き）
+         * 【修正点】APIレスポンスエラー時の詳細ログとエラーメッセージを追加
+         */
+        async function fetchGeminiApi(payload, type) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+            const maxRetries = 5;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        console.error(`API Request Failed (${type}): Status ${response.status}`, errorBody);
+
+                        if (response.status === 429 && i < maxRetries - 1) {
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            console.warn(`Rate limit hit, retrying in ${delay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        
+                        // ステータスコードに応じた具体的なエラーメッセージ
+                        let detailMessage = `APIからの応答に失敗しました (ステータス: ${response.status})。`;
+                        if (response.status === 400) {
+                             detailMessage += "入力内容に問題がある可能性があります。";
+                        } else if (response.status === 403) {
+                             detailMessage += "認証エラーまたは権限不足の可能性があります（APIキーを確認してください）。";
+                        } else if (response.status === 429) {
+                             detailMessage += "リクエストが多すぎます。しばらくお待ちください。";
+                        }
+                        throw new Error(detailMessage + ` 詳細: ${errorBody.substring(0, 100)}...`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (payload.generationConfig && payload.generationConfig.responseMimeType === "application/json") {
+                        const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (jsonText) {
+                            // JSONパース前に、バッククォートや不要なテキストを削除
+                            let cleanedJsonText = jsonText.trim();
+                            if (cleanedJsonText.startsWith('```json')) {
+                                cleanedJsonText = cleanedJsonText.substring(7);
+                            }
+                            if (cleanedJsonText.endsWith('```')) {
+                                cleanedJsonText = cleanedJsonText.substring(0, cleanedJsonText.length - 3);
+                            }
+                            return JSON.parse(cleanedJsonText.trim());
+                        } else {
+                            throw new Error("JSON形式の生成コンテンツが取得できませんでした。");
+                        }
+                    } else {
+                        return result.candidates?.[0]?.content?.parts?.[0]?.text || '生成されたコンテンツがありませんでした。入力情報を見直してください。';
+                    }
+
+                } catch (error) {
+                    console.error(`Gemini API call failed (${type}):`, error);
+                    if (i === maxRetries - 1) {
+                        throw new Error(`エラーが発生しました: ${error.message}。しばらくしてから再試行してください。`);
+                    }
+                }
+            }
+        }
+
+        // --- Core Feature Functions ---
+
+        /**
+         * 求人原稿を生成するメイン関数 (初期生成 or ピン留めベースの再生成)
+         */
+        window.generateCopy = async function() {
+            const storeFeatures = storeFeaturesTextarea.value.trim();
+            if (!storeFeatures) {
+                errorMessage.textContent = 'お店の特徴・魅力のソース情報は必須です。入力してください。';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            setUILoading(true, 'generate');
+            errorMessage.classList.add('hidden');
+            
+            // 処理中にエラー情報も含むメッセージを表示
+            currentDraftDisplay.textContent = '魅力的な原稿を生成しています... API通信に問題がある場合は、数秒後にここにエラー詳細が表示されます。';
+            
+            // 9. 参考原稿として、ピン留めされた文章があればそれを優先的に使用
+            const toneReferenceText = pinnedDraft ? pinnedDraft.text : templateCopyTextarea.value.trim();
+            const referenceNote = pinnedDraft ? '（ピン留めされた文章をトーン・構成の参考にします）' : templateCopyTextarea.value.trim() ? '（入力された参考原稿をトーン・構成の参考にします）' : '（参考原稿の入力なし）';
+
+            // 各設定値の取得
+            const jobTitle = jobTitleSelect.value.trim();
+            const target = targetInput.value.trim() || targetInput.placeholder.split(',')[0].replace('例: ', '').trim();
+            const recruitmentPhase = recruitmentPhaseInput.value.trim() || recruitmentPhaseInput.placeholder.split(',')[0].replace('例: ', '').trim();
+            const tone = toneInput.value.trim() || toneInput.placeholder.split(',')[0].replace('例: ', '').trim();
+            
+            const dividerPreference = getPreferenceString(dividerStyleSelect.value, 'divider');
+            const symbolPreference = getPreferenceString(symbolStyleSelect.value, 'symbol');
+            const emojiPreference = getPreferenceString(emojiLevelInput.value, 'emoji');
+
+
+            const userQuery = `
+                以下の情報をもとに、求人広告の本文を作成してください。
+
+                1. 募集職種: ${jobTitle}
+                2. 採用ターゲット: ${target}
+                3. 募集背景・成長フェーズ: ${recruitmentPhase}
+                4. 希望するトーン/文体: ${tone}
+                5. 絵文字（環境依存文字）の利用度: ${emojiPreference}
+                6. 本文の区切り線・罫線のスタイル: ${dividerPreference}
+                7. 箇条書き・強調シンボルの種類: ${symbolPreference}
+                
+                8. ソース情報（事実ベースの情報）:
+                --- ＜お店の特徴・店舗情報＞ ---
+                ${storeFeatures}
+                
+                9. トーンと構成の参考原稿（内容ではなく、文体・リズム・見出し構成を継承してください）:
+                --- ＜参考原稿本文＞ ---
+                ${toneReferenceText || referenceNote}
+                
+                [厳守事項]
+                1. 生成内容は、必ず「お店の特徴・店舗情報」を基に、ターゲットにとって魅力的なメリットに変換したものです。
+                2. 「参考原稿本文」が入力されている場合、その内容ではなく、文体と構成を学習するために使用してください。
+                3. 上記すべての設定（1〜7）を厳密に守って生成してください。
+                4. 見出しや箇条書きを効果的に使用し、読みやすく構成してください。
+                5. **強調表現として、Markdownの太字記法（アスタリスク二つでの囲み）は一切使用しないでください。** 代わりに【】や〈〉、装飾的なユニコードシンボルを使ってください。
+                6. 「私たちがご提供するのは、単なる○○ではありません。」のようなAI生成特有のありふれた表現は、一切使用しないでください。
+                7. 提供されたソース情報を深く分析し、ターゲットに響く具体的で新しい表現を創出してください。
+                
+                [文章構成の順序]
+                以下の論理的かつ段階的な構成を厳守してください。
+                1. 導入 (募集背景とお店のコンセプト紹介)
+                2. 提供するメニューの特徴・こだわり
+                3. お店の雰囲気・働きやすさ（人間関係、独自のルールなど）
+                4. 求職者に求めること（求める人物像、歓迎スキルなど）
+                5. 提供できること（スキルアップ、キャリア、やりがいなど）
+                6. 応募を促す強いメッセージと結びの言葉
+                
+                ・出力は生成された本文のみとしてください。
+            `;
+
+            console.log("--- Sending User Query to Gemini API ---");
+            console.log(userQuery);
+            console.log("-----------------------------------------");
+            
+            const systemPrompt = "あなたは飲食業界専門の求人広告コピーライターです。入力された生の情報（事実ベース）を、求職者が「働きたい」と感じる魅力的な広告本文（メリットベース）に変換してください。文体を調整し、ターゲットに響く言葉遣いを徹底し、参考原稿のトーンを継承してください。他社や業界を蔑む表現は使用せず、常に前向きな表現を心掛けてください。**特に、強調記法（Markdown太字）と陳腐な表現を排除し、情報源に基づいた深みのある言葉を選ぶことを最優先します。** 出力は日本語の本文のみとします。";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const resultText = await fetchGeminiApi(payload, 'generate');
+                updateDraftAndHistory(resultText);
+                alertMessage('新しい求人原稿を生成しました！', 'blue');
+            } catch (error) {
+                // エラー発生時は、エラーメッセージをドラフトとエラー表示エリアに表示
+                const errorMessageText = `原稿生成エラー: ${error.message}`;
+                currentDraftDisplay.textContent = errorMessageText + '\n\nコンソールに詳細ログが出力されています。';
+                errorMessage.textContent = errorMessageText;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                setUILoading(false, 'generate');
+            }
+        }
+
+        /**
+         * 現在のドラフトをリライトする関数
+         */
+        window.refineCopy = async function() {
+            const instruction = refineInput.value.trim();
+            const currentText = currentDraftDisplay.textContent.trim();
+            
+            if (!instruction || !currentText || currentText === '求人原稿を生成すると、ここに最新のドラフトが表示されます。') {
+                refineErrorMessage.textContent = 'リライト指示と有効な現在のドラフトの両方が必要です。';
+                refineErrorMessage.classList.remove('hidden');
+                return;
+            }
+
+            setUILoading(true, 'refine');
+            refineErrorMessage.classList.add('hidden');
+            currentDraftDisplay.textContent = currentText + '\n\n...リライト中...'; // 処理中であることを表示
+
+            const userQuery = `
+                以下の現在の求人原稿の本文を、[リライト指示]に厳密に従って修正・調整してください。
+                
+                [リライト指示]
+                ${instruction}
+                
+                [現在の求人原稿の本文]
+                ---
+                ${currentText}
+                ---
+                
+                [厳守事項]
+                1. リライト指示以外の要素（トーン、絵文字、装飾スタイル）は極力維持してください。
+                2. **強調表現として、Markdownの太字記法（アスタリスク二つでの囲み）は一切使用しないでください。** 代わりに【】や〈〉、装飾的なユニコードシンボルを使ってください。
+                3. 出力は修正後の本文のみとしてください。
+            `;
+
+            const systemPrompt = "あなたはプロの編集者であり、求人原稿の微妙なニュアンス調整の専門家です。提供された本文を、ユーザーの具体的な指示に従って、違和感のない自然な日本語でリライトしてください。元の文章の構造と意図を尊重しつつ、指示された変更（言葉の置き換え、箇条書きの追加、トーンの変更など）を正確に適用してください。**強調記法（Markdown太字）を排除することを厳守してください。** 出力は日本語の本文のみとします。";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const resultText = await fetchGeminiApi(payload, 'refine');
+                updateDraftAndHistory(resultText);
+                refineInput.value = ''; // 成功したらリライト指示をクリア
+                alertMessage('ドラフトをリライトしました！', 'blue');
+            } catch (error) {
+                const errorMessageText = `リライトエラー: ${error.message}`;
+                currentDraftDisplay.textContent = currentText; // 失敗したら元に戻す
+                refineErrorMessage.textContent = errorMessageText;
+                refineErrorMessage.classList.remove('hidden');
+            } finally {
+                setUILoading(false, 'refine');
+            }
+        }
+        
+        /**
+         * 短文コピー（キャッチコピーと業態名）を生成する関数
+         */
+        window.generateShortCopy = async function() {
+            const currentText = currentDraftDisplay.textContent.trim();
+            
+            if (!currentText || currentText === '求人原稿を生成すると、ここに最新のドラフトが表示されます。') {
+                shortCopyErrorMessage.textContent = 'キャッチコピーを生成するには、まず原稿本文を生成するか、ドラフトエリアに文章を入力してください。';
+                shortCopyErrorMessage.classList.remove('hidden');
+                return;
+            }
+
+            setUILoading(true, 'short_copy');
+            shortCopyErrorMessage.classList.add('hidden');
+            shortCopyOutputPanel.innerHTML = '<p class="text-amber-700 text-center animate-pulse">キャッチコピーと業態名を生成中です...</p>';
+            shortCopyOutputPanel.classList.remove('hidden');
+
+            const userQuery = `
+                以下の求人原稿の本文を詳細に分析し、内容に基づいた魅力的なコピーをJSON形式で生成してください。
+                
+                [求人原稿の本文]
+                ---
+                ${currentText}
+                ---
+
+                [生成要件]
+                1. キャッチコピー案: 5案。日本語の全角で**40文字以上50文字以内を絶対に厳守**してください。**環境依存文字（絵文字）は1文字につき2文字扱い**として、合計文字数が**50文字を超えない**ことを最優先してください。
+                2. 業態の詳細名: 5案。そのお店の業態を端的に表す短い名前。日本語の全角で25文字以内を厳守してください。
+                3. 出力はJSON形式のみとし、他のテキストは一切含めないでください。
+            `;
+
+            const systemPrompt = "あなたは飲食店の求人広告に特化した天才コピーライターです。入力された長文の魅力と情報を抽出し、集客力を高める短いフレーズ案と、業態を魅力的に伝える詳細名案を、指定された文字数制限とJSON形式で正確に生成してください。キャッチコピーは**40文字以上50文字以内を絶対に厳守**し、絵文字（2文字換算）を有効活用して、魅力的な表現を行ってください。";
+            
+            // 構造化JSONスキーマの定義
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    "catchphrases": { 
+                        type: "ARRAY", 
+                        description: "日本語の全角で40文字以上50文字以内（絵文字は2文字換算）のキャッチコピー案5つ。",
+                        items: { type: "STRING" }
+                    },
+                    "businessDetails": {
+                        type: "ARRAY",
+                        description: "日本語の全角で25文字以内の業態の詳細名5つ。",
+                        items: { type: "STRING" }
+                    }
+                },
+                propertyOrdering: ["catchphrases", "businessDetails"]
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                },
+            };
+
+            try {
+                const resultData = await fetchGeminiApi(payload, 'short_copy');
+                renderShortCopyOutput(resultData);
+                alertMessage('短文コピーの生成が完了しました！', 'amber');
+            } catch (error) {
+                const errorMessageText = `コピー生成エラー: ${error.message}`;
+                shortCopyOutputPanel.innerHTML = `<p class="text-red-600">生成エラー: ${errorMessageText}</p>`;
+                shortCopyErrorMessage.textContent = errorMessageText;
+                shortCopyErrorMessage.classList.remove('hidden');
+            } finally {
+                setUILoading(false, 'short_copy');
+            }
+        }
+        
+        /**
+         * 短文コピーの生成結果をUIにレンダリングする
+         * @param {Object} data - { catchphrases: [], businessDetails: [] } 形式のデータ
+         */
+        function renderShortCopyOutput(data) {
+            let html = '';
+            
+            // 1. キャッチコピー案
+            if (data.catchphrases && data.catchphrases.length > 0) {
+                // UI表示タイトルを修正: 50文字以内厳守に
+                html += `
+                    <h3 class="text-lg font-bold text-amber-800 border-b border-amber-300 pb-1 flex items-center">
+                        <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.586 2.586a1 1 0 001.414-1.414L11 9.586V6z" clip-rule="evenodd"></path></svg>
+                        キャッチコピー案 (50文字以内厳守・絵文字2文字換算)
+                    </h3>
+                    <ul class="list-none space-y-2 pl-0">
+                `;
+                data.catchphrases.forEach((copy, index) => {
+                    html += `<li class="text-sm text-gray-800 font-medium bg-amber-100 p-2 rounded-md hover:bg-amber-200 transition duration-150 cursor-pointer" title="クリックでコピー" onclick="copyToClipboardText(this.textContent)">
+                        <span class="text-amber-600 font-bold mr-2">【${index + 1}】</span>${copy}
+                    </li>`;
+                });
+                html += `</ul>`;
+            }
+
+            // 2. 業態の詳細名
+            if (data.businessDetails && data.businessDetails.length > 0) {
+                html += `
+                    <h3 class="text-lg font-bold text-amber-800 border-b border-amber-300 pb-1 mt-6 flex items-center">
+                        <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.077 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.817 2.052a1 1 0 00-.363 1.118l1.077 3.292c.3.921-.755 1.688-1.538 1.118l-2.817-2.052a1 1 0 00-1.175 0l-2.817 2.052c-.783.57-1.838-.197-1.538-1.118l1.077-3.292a1 1 0 00-.363-1.118L2.022 8.72c-.783-.57-.381-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.077-3.292z"></path></svg>
+                        業態の詳細名案 (25文字以内)
+                    </h3>
+                    <ul class="list-none space-y-2 pl-0">
+                `;
+                data.businessDetails.forEach((name, index) => {
+                    html += `<li class="text-sm text-gray-800 font-medium bg-amber-100 p-2 rounded-md hover:bg-amber-200 transition duration-150 cursor-pointer" title="クリックでコピー" onclick="copyToClipboardText(this.textContent)">
+                        <span class="text-amber-600 font-bold mr-2">【${index + 1}】</span>${name}
+                    </li>`;
+                });
+                html += `</ul>`;
+            }
+
+            shortCopyOutputPanel.innerHTML = html;
+        }
+
+
+        /**
+         * 生成結果をクリップボードにコピーする関数 (既存)
+         */
+        window.copyToClipboard = function() {
+            const textToCopy = currentDraftDisplay.textContent;
+            if (textToCopy) {
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = 0;
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    document.execCommand('copy');
+                    alertMessage('クリップボードにコピーしました！', 'gray');
+                } catch (err) {
+                    alertMessage('コピーに失敗しました。', 'red');
+                    console.error('Copy failed:', err);
+                } finally {
+                    document.body.removeChild(textarea);
+                }
+            }
+        }
+        
+        /**
+         * 任意のテキストをクリップボードにコピーするヘルパー関数
+         * (短文コピーのリストアイテムからのコピー用)
+         */
+        window.copyToClipboardText = function(text) {
+            const cleanText = text.replace(/【\d】/, '').trim(); // リスト番号を削除
+            const textarea = document.createElement('textarea');
+            textarea.value = cleanText;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = 0;
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            try {
+                document.execCommand('copy');
+                alertMessage(`「${cleanText.substring(0, 15)}...」をコピーしました！`, 'gray');
+            } catch (err) {
+                alertMessage('コピーに失敗しました。', 'red');
+                console.error('Copy failed:', err);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+        
+        /**
+         * 設定値からAPI用の文字列を生成 (省略)
+         */
+        function getPreferenceString(value, type) {
+            switch (type) {
+                case 'divider':
+                    switch (value) {
+                        case "default": return "セクションの区切りは、シンプルな「----------」などのラインを使用してください。";
+                        case "star-diamond": return "セクションの区切りは、「✦*---*✦」のような星やダイヤモンドを使用した装飾的なラインを使用してください。";
+                        case "wave-dot": return "セクションの区切りは、「〜〜・〜〜」のような波線とドットを使用した飾り罫線を使用してください。";
+                        case "unicode-fancy": return "セクションの区切りは、「⊹✦･.━━━━━━━」のようなモダンで派手なユニコード装飾線を使用してください。";
+                        case "diamond-line": return "セクションの区切りは、「---◇---◇---」のようなダイヤモンドを使ったラインを使用してください。";
+                        case "star-block": return "セクションの区切りは、「＊＊＊＊＊」のような星のブロック線を使用してください。";
+                        case "colon-dot": return "セクションの区切りは、「---:::---:::---」のようなコロンやドットを使ったラインを使用してください。";
+                        case "reference-block": return "セクションの区切りは、「※※※※※※」のような参考マークのブロック線を使用してください。";
+                        case "wave-full": return "セクションの区切りは、「〰️〰️〰️〰️〰️」のような波線（絵文字）を使用してください。";
+                        case "arrow-line": return "セクションの区切りは、「---▶︎---▶︎---」のような矢印を使ったラインを使用してください。";
+                        case "none": return "セクション間の区切り線・罫線は一切使用しないでください。";
+                        default: return "シンプルな「----------」を使用してください。";
+                    }
+                case 'symbol':
+                    const symbolMap = {
+                        "checkmark-emoji": "✅", "star-symbol": "★", "flower-emoji": "🌸",
+                        "hand-point": "👉", "double-circle": "◎", "music-note": "♪",
+                        "lightbulb": "💡", "thumbs-up": "👍", "heart": "💖",
+                        "fire": "🔥", "sparkle": "✨", "dash": "－"
+                    };
+                    const symbol = symbolMap[value] || "－";
+                    return `箇条書きや強調のシンボルとして「${symbol}」を使用してください。`;
+                case 'emoji':
+                    const level = parseInt(value, 10);
+                    switch (level) {
+                        case 1: return "控えめに使用してください（重要な見出しや区切りにのみ）";
+                        case 2: return "標準的に使用してください（各セクションの区切りや強調したい箇所）";
+                        case 3: return "多めに使用してください（各項目の先頭、強調箇所、文末など）";
+                        case 4: return "非常に多めに使用してください（若者向けに、装飾として積極的に）";
+                        default: return "標準的に使用してください";
+                    }
+            }
+        }
+    </script>
+</body>
+</html>
